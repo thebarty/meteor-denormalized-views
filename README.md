@@ -15,25 +15,14 @@ Additionally you can hookup "related"-collections to automatically refresh the "
 # Table of Contents
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
 
 - [Example Use-Case](#example-use-case)
 - [Setup by ``addSyncronisation()``](#setup-by-addsyncronisation)
 - [Staying in sync](#staying-in-sync)
-  - [Automatically sync thru other collections](#automatically-sync-thru-other-collections)
-  - [Manually syncing, p.e. in Meteor.methods](#manually-syncing-pe-in-meteormethods)
-  - [Refreshing the whole collection](#refreshing-the-whole-collection)
-- [TODOS:](#todos)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
-- [Example Use-Case](#example-use-case)
-- [Installation](#installation)
-- [Setup by ``addSyncronisation()``](#setup-by-addsyncronisation)
-- [Staying in sync](#staying-in-sync)
-  - [Automatically sync thru other collections](#automatically-sync-thru-other-collections)
-  - [Manually syncing, p.e. in Meteor.methods](#manually-syncing-pe-in-meteormethods)
-  - [Refreshing the whole collection](#refreshing-the-whole-collection)
+  - [**Automatically** refresh by related collections (``refreshByCollection()``)](#automatically-refresh-by-related-collections-refreshbycollection)
+  - [**Manually** refreshing **individual** docs (``refreshManually()``)](#manually-refreshing-individual-docs-refreshmanually)
+  - [**Manually** refreshing the **whole** collection (``refreshAll()``)](#manually-refreshing-the-whole-collection-refreshall)
 - [TODOS:](#todos)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -126,7 +115,7 @@ There are 2 options to refresh the view-collection:
  2. do it **manually** via ``refreshManually(ID)``
 
 
-## Automatically sync thru other collections
+## **Automatically** refresh by related collections (``refreshByCollection()``)
 
 If you know that the ``targetCollection`` will always need to refresh, whenever a related collection (p.e. Authors) changes, use the ``refreshByCollection()`` function to trigger it. 
 
@@ -145,7 +134,7 @@ DenormalizedViews.refreshByCollection({
 ```
 
 
-## Manually syncing, p.e. in Meteor.methods
+## **Manually** refreshing **individual** docs (``refreshManually()``)
 
 There might be places where you want to manually refresh the view-colection, p.e. in a ``Meteor.method``. You can use ``refreshManually()`` to do so:
 
@@ -159,7 +148,7 @@ DenormalizedViews.refreshManually({
 ```
 
 
-## Refreshing the whole collection
+## **Manually** refreshing the **whole** collection (``refreshAll()``)
 
 If you ever want to manually refresh the whole view collection, you can use ``refreshAll()``. 
 
