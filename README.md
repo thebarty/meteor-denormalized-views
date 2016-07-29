@@ -4,7 +4,7 @@
 # Denormalized Views for Meteor
 *thebarty:denormalized-views*
 
-A toolkit that helps you to create "readonly" denormalized mongo-"views" (collections), which are especially useful for searchable UI-tables, or other read-heavy scenarios (*see "Example Use-Case" for a quick overview*).
+A toolkit that helps you to create "readonly" denormalized mongo-"views" (collections), which are especially useful for searchable UI-tables, or other read-heavy scenarios (*see "[Example Use-Case](#example-use-case)" for a quick overview*).
 
 The resulting "view"-collection can then be used with tools like ``aldeed:tabular``, or ``easy:search`` to display and search related data.
 
@@ -15,6 +15,27 @@ Additionally you can hookup "related"-collections to automatically refresh the "
 # Table of Contents
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+- [Example Use-Case](#example-use-case)
+- [Setup by ``addSyncronisation()``](#setup-by-addsyncronisation)
+- [Staying in sync](#staying-in-sync)
+  - [Automatically sync thru other collections](#automatically-sync-thru-other-collections)
+  - [Manually syncing, p.e. in Meteor.methods](#manually-syncing-pe-in-meteormethods)
+  - [Refreshing the whole collection](#refreshing-the-whole-collection)
+- [TODOS:](#todos)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+- [Example Use-Case](#example-use-case)
+- [Installation](#installation)
+- [Setup by ``addSyncronisation()``](#setup-by-addsyncronisation)
+- [Staying in sync](#staying-in-sync)
+  - [Automatically sync thru other collections](#automatically-sync-thru-other-collections)
+  - [Manually syncing, p.e. in Meteor.methods](#manually-syncing-pe-in-meteormethods)
+  - [Refreshing the whole collection](#refreshing-the-whole-collection)
+- [TODOS:](#todos)
+
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 
@@ -35,9 +56,6 @@ In your app you wnat to show a list of posts and give the user the option to sea
 ![chained denormalizations](https://github.com/thebarty/meteor-denormalized-views/blob/master/docs/user-interface.jpg)
 
 You know that ``aldeed:tabular`` is a great package to list a collection in the frontent. Altough it can easily show joined collection thru a package like ``reywood:publish-composite``, it does NOT support search over joined collections. **Here is where ``denormalized-views`` comes into play**: simply create a denormalized "view"-collection and use it to display and search data thru tabular.
-
-
-# Installation
 
 
 # Setup by ``addSyncronisation()``
