@@ -74,7 +74,7 @@ There is also a ``postSync`` property, which acts the same as ``sync``, but is r
 ```js
 const DENORMALIZED_POST_COLLECTION = 'DENORMALIZED_POST_COLLECTION'
 
-viewDenormalizer.addSyncronisation({
+DenormalizedViews.addSyncronisation({
   identifier: DENORMALIZED_POST_COLLECTION,  // unique id for syncronisation
   sourceCollection: Posts,
   targetCollection: PostsDenormalized,
@@ -128,15 +128,15 @@ There are 2 options to refresh the view-collection:
 
 ## Automatically sync thru other collections
 
-If you know that the ``targetCollection`` will always need to refresh, whenever a related collection changes, use the ``refreshByCollection()`` function to trigger it. 
+If you know that the ``targetCollection`` will always need to refresh, whenever a related collection (p.e. Authors) changes, use the ``refreshByCollection()`` function to trigger it. 
 
-Within the ``_ids``-parameters function it will pass you the doc (of the related target-collection) and ask you to **return an array of ``Mongo _ids`` of the sourceCollection-docs that should be refreshed**. If you return false, undefined or null a refresh will NOT be triggered.
+Within the ``refreshIds``-parameters function it will pass you the doc (of the related-collection) and ask you to **return an array of ``Mongo refreshIds`` of the sourceCollection-docs that should be refreshed**. If you return false, undefined or null a refresh will NOT be triggered.
 
 ```js
-viewDenormalizer.refreshByCollection({
+DenormalizedViews.refreshByCollection({
   identifier: DENORMALIZED_POST_COLLECTION,
   triggerCollection: Authors,
-  _ids: (doc) {
+  refreshIds: (doc) {
     // return _id-array of posts that should be updated
     // return false or undefined to NOT sync
     return Posts.find({})
@@ -152,25 +152,24 @@ There might be places where you want to manually refresh the view-colection, p.e
 ```js
 // this is the manual way of doing it,
 //  p.e. from a ``Meteor.method``
-viewDenormalizer.refreshManually({
+DenormalizedViews.refreshManually({
   identifier: DENORMALIZED_POST_COLLECTION, 
-  _ids: [Mongo._id]  // _id-array of posts that shoudl be updated
+  refreshIds: [Mongo._id]  // _id-array of posts that shoudl be updated
 })
 ```
 
 
 ## Refreshing the whole collection
 
-If you ever want to manually refresh the whole view collection, you can use ``refreshWholeCache()``. 
+If you ever want to manually refresh the whole view collection, you can use ``refreshAll()``. 
 
 **Note that this is the slowest option, because the whole table will be refreshed.**
 
 ```js
-viewDenormalizer.refreshWholeCache(DENORMALIZED_POST_COLLECTION)
+DenormalizedViews.refreshAll(DENORMALIZED_POST_COLLECTION)
 ```
 
 # TODOS:
- * finish api
  * write tests
  * implement
  * release
