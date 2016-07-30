@@ -1,5 +1,4 @@
-**WARNING: THIS IS WORK IN PROGRESS - THIS IS TOTALLY UNUSABLE RIGHT NOW!!!**
-**WARNING: THIS IS WORK IN PROGRESS - THIS IS TOTALLY UNUSABLE RIGHT NOW!!!**
+**WARNING: THIS IS AN EARLY RELEASE CANDIDATE. ALL TESTS PASS, BUT WE ARE LOOKING FOR FEEDBACK ON THIS TO MAKE IT 100% PRODUCTION STABLE. PLEASE TRY IT OUT AND GIVE US FEEDBACK!!!**
 
 # Denormalized Views for Meteor
 *thebarty:denormalized-views*
@@ -12,20 +11,35 @@ Simply define how the data shall be collected based on a "source"-collection. Wh
 
 Additionally you can hookup "related"-collections to automatically refresh the "source"-collection or trigger manual refreshes (*if neccessary at all*).
 
+
 # Table of Contents
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
 
+- [Installation](#installation)
 - [Example Use-Case](#example-use-case)
 - [Setup by ``addSyncronisation()``](#setup-by-addsyncronisation)
 - [Staying in sync](#staying-in-sync)
   - [**Automatically** refresh by related collections (``refreshByCollection()``)](#automatically-refresh-by-related-collections-refreshbycollection)
   - [**Manually** refreshing **individual** docs (``refreshManually()``)](#manually-refreshing-individual-docs-refreshmanually)
   - [**Manually** refreshing the **whole** collection (``refreshAll()``)](#manually-refreshing-the-whole-collection-refreshall)
-- [TODOS:](#todos)
+- [Debug mode ``DenormalizedViews.Debug = true``](#debug-mode-denormalizedviewsdebug--true)
+- [Defer syncing via ``DenormalizedViews.DeferWriteAccess``](#defer-syncing-via-denormalizedviewsdeferwriteaccess)
+- [Open Todos](#open-todos)
+- [How to contribute to this package](#how-to-contribute-to-this-package)
+- [Research Resources](#research-resources)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+
+# Installation
+
+In your Meteor app directory, enter:
+
+```
+$ meteor add thebarty:denormalized-views
+```
 
 
 # Example Use-Case
@@ -57,6 +71,7 @@ There is also a ``postSync`` property, which acts the same as ``sync``, but is r
 
 *Behing the scenes*
 *The package will run this ``sync``-process anytime the sourceCollection receives an Mongo- ``insert``, ``update`` or ``remove``-command. ``insert``- and ``update``-commands will put the doc thru ``sync`` && ``postSync`` and transfer the resulting doc into targetCollection. Of course the ``_id`` will be the same in both collections. A ``remove`` will remove the doc from targetCollection.*
+
 
 **Start by defining your syncronization:**
 
@@ -159,23 +174,31 @@ DenormalizedViews.refreshAll(DENORMALIZED_POST_COLLECTION)
 ```
 
 
-## Remove a syncronisation ``remove()``
-
-If you ever want to disable a syncronisation, you can use ``remove()``.
-
-*This function is here to simplify testing. You probably do NOT need it in your app.*
-
-```js
-DenormalizedViews.remove(DENORMALIZED_POST_COLLECTION)
-```
-
 # Debug mode ``DenormalizedViews.Debug = true``
 
 ```js
-import { DenormalizedViews } from 'meteor/denormalized-views'
+import { DenormalizedViews } from 'thebarty:denormalized-views'
 // enable logs
 DenormalizedViews.Debug = true
 ```
+
+
+# Defer syncing via ``DenormalizedViews.DeferWriteAccess``
+
+If you don't care about data being sync 100% real-time and want to relax the server, you can switch on ``DenormalizedViews.DeferWriteAccess = true``. This will wrap all ``insert-`` | ``updates``– | ``removes``-commands into a ``Meteor.defer()`` an make those writes run asynchronously in the background. Data will take a bit longer to be synced to the "view"-collections. By default this setting is switched off.
+
+```js
+import { DenormalizedViews } from 'thebarty:denormalized-views'
+// enable Meteor.defer() for writes
+DenormalizedViews.DeferWriteAccess = true
+```
+
+
+# Open Todos
+
+ * Receive feedback from the community
+ * Find out, which minimal package requirement there are. *I have only tested this package with the meteor 1.3*. Maybe we can lower ``api.versionsFrom('1.3.5.1')`` in ``package.js`` to make it available for older projects?
+
 
 # How to contribute to this package
 
@@ -186,7 +209,6 @@ Lets make this perfect and collaborate. This is how to set up your local testing
  4. develop, write tests, and submit a pull request
 
 
-# TODOS:
- * write tests
- * implement
- * release
+# Research Resources
+
+ * [1] https://themeteorchef.com/snippets/using-unblock-and-defer-in-methods/#tmc-when-to-use-unblock-vs-defer When to use Meteor.defer(). Inspiration our ``DenormalizedViews.DeferWriteAccess``-setting.

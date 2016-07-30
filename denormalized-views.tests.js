@@ -9,12 +9,13 @@ import { Meteor } from 'meteor/meteor'
 import { Mongo } from 'meteor/mongo'
 import { SimpleSchema } from 'meteor/aldeed:simple-schema'
 
-import { DenormalizedViews, ERROR_IDENTIFIERT_EXISTS, ERROR_SOURCE_AND_TARGET_COLLECTIONS_NEED_TO_BE_DIFFERENT, ERROR_SYNC_NEEDS_TO_HAVE_CONTENT, ERROR_SYNC_ALREADY_EXISTS_FOR_SOURCE_TARGET_COLLECTIONS, ERROR_REFRESH_BY_COLLECTION_CAN_NOT_BE_SET_TO_SOURCE_COLLECTION, ERROR_REFRESH_BY_COLLECTION_NEEDS_TO_BE_ASSIGNED_TO_AN_EXISTING_ID } from 'meteor/denormalized-views'
+import { DenormalizedViews, ERROR_IDENTIFIERT_EXISTS, ERROR_SOURCE_AND_TARGET_COLLECTIONS_NEED_TO_BE_DIFFERENT, ERROR_SYNC_NEEDS_TO_HAVE_CONTENT, ERROR_SYNC_ALREADY_EXISTS_FOR_SOURCE_TARGET_COLLECTIONS, ERROR_REFRESH_BY_COLLECTION_CAN_NOT_BE_SET_TO_SOURCE_COLLECTION, ERROR_REFRESH_BY_COLLECTION_NEEDS_TO_BE_ASSIGNED_TO_AN_EXISTING_ID } from 'meteor/thebarty:denormalized-views'
 
 DenormalizedViews.Debug = true
 
 // FIXTURES
 const Authors =  new Mongo.Collection('authors')
+const Categories = new Mongo.Collection('categories')
 const Comments = new Mongo.Collection('comments')
 const Posts = new Mongo.Collection('posts')
 const PostsDenormalizedView = new Mongo.Collection('postsdenormalizedview')
@@ -29,6 +30,14 @@ Comments.attachSchema(new SimpleSchema({
     type: String,
   },
 }))
+Categories.attachSchema(new SimpleSchema({
+  text: {
+    type: String,
+  },
+  postId: {
+    type: String,
+  }
+}))
 Posts.attachSchema(new SimpleSchema({
   text: {
     type: String,
@@ -41,6 +50,10 @@ Posts.attachSchema(new SimpleSchema({
   },
   commentIds: {
     type: [String],
+    optional: true,
+  },
+  categoryId: {  // field to test insert-commant on refreshByCollection
+    type: String,
     optional: true,
   },
 }))
@@ -63,6 +76,9 @@ DenormalizedViews.addSyncronisation({
     authorCache: (post, userId) => {
       return Authors.findOne(post.authorId)
     },
+    categoryCache: (post, userId) => {
+      return Categories.findOne(post.categoryId)
+    },
   },
   postSync: {
     wholeText: (post, userId) => {
@@ -82,9 +98,22 @@ DenormalizedViews.refreshByCollection({
   identifier: DENORMALIZED_POST_COLLECTION,
   triggerCollection: Authors,
   refreshIds: (author, userId) => {
+    expect(author).to.be.defined
     // return _id-array of posts that should be updated
     // return false, an empty array or undefined to NOT sync
     const posts = Posts.find({ authorId: author._id }).fetch()
+    return _.pluck(posts, '_id')
+  },
+})
+
+DenormalizedViews.refreshByCollection({
+  identifier: DENORMALIZED_POST_COLLECTION,
+  triggerCollection: Categories,
+  refreshIds: (category, userId) => {
+    expect(category).to.be.defined
+    // return _id-array of posts that should be updated
+    // return false, an empty array or undefined to NOT sync
+    const posts = Posts.find({ _id: category.postId }).fetch()
     return _.pluck(posts, '_id')
   },
 })
@@ -328,9 +357,21 @@ if (Meteor.isServer) {
       expect(postDenormalized1.wholeText).to.equal('post 1, comment 1, ')
     })
 
-    xit('.refreshByCollection works as expected on inserts on triggerCollection', function () {
-      // INSERT
-      // TODO: write test for useCases where this would be useful
+    it('.refreshByCollection works as expected on inserts on triggerCollection', function () {
+      const fixtures = setupFixtures()
+      validateFixtures()
+
+      // this is a weird useCase for an insert-trigger, because oin order
+      // to keep data consistentand enable Posts "view-collection"
+      // to load the correct data, we need to set Posts.categoryId anyway.
+      // So this test does NOT really make sense as it does NOT test, how triggerCollection()
+      // works on insert, except that it makes sure that NO errors are thrown.
+      const categoryId1 = Categories.insert({ text: 'category 1', postId: fixtures.postId1 })
+      const postDenormalized1 = PostsDenormalizedView.findOne(fixtures.postId1)
+      expect(postDenormalized1.categoryCache).to.be.undefined
+      Posts.update(fixtures.postId1, { $set: { categoryId: categoryId1 } })
+      const postDenormalized1_2 = PostsDenormalizedView.findOne(fixtures.postId1)
+      expect(postDenormalized1_2.categoryCache.text).to.equal('category 1')
     })
 
     it('.refreshManually works as expected', function () {
@@ -364,6 +405,7 @@ if (Meteor.isServer) {
       Comments.update(fixtures.commentId1, { $set: { text: 'comment 1 new text' } })
       Comments.update(fixtures.commentId2, { $set: { text: 'comment 2 new text' } })
       Comments.update(fixtures.commentId3, { $set: { text: 'comment 3 new text' } })
+      Comments.update(fixtures.commentId4, { $set: { text: 'comment 4 new text' } })
 
       DenormalizedViews.refreshAll(DENORMALIZED_POST_COLLECTION)
 
@@ -379,15 +421,7 @@ if (Meteor.isServer) {
       expect(postDenormalized3.commentsCache.length).to.equal(0)
       expect(postDenormalized4.commentsCache.length).to.equal(1)
       expect(postDenormalized4.commentsCache[0].text).to.equal('comment 4 new text')
-    })
 
-    it('.remove works as expected', function () {
-      setupFixtures()
-      validateFixtures()
-
-      DenormalizedViews.remove(DENORMALIZED_POST_COLLECTION)
-      setupFixtures()  // run inserts
-      expect(PostsDenormalizedView.find().count()).to.equal(0)
     })
   })
 }

@@ -1,12 +1,8 @@
 Package.describe({
-  name: 'denormalized-views',
+  name: 'thebarty:denormalized-views',
   version: '0.0.1',
-  // Brief, one-line summary of the package.
-  summary: '',
-  // URL to the Git repository containing the source code for this package.
-  git: '',
-  // By default, Meteor will default to using README.md for documentation.
-  // To avoid submitting documentation, set this field to null.
+  summary: 'A toolkit that helps you to create "readonly" denormalized mongo-"views" (collections), which are especially useful for searchable tables, or other read-heavy scenarios',
+  git: 'https://github.com/thebarty/meteor-denormalized-views',
   documentation: 'README.md'
 });
 
@@ -27,7 +23,6 @@ Package.onUse(function(api) {
 });
 
 Package.onTest(function(api) {
-  // You should also include any packages you need to use in the test code
   api.use([
     'check',
     'ecmascript',
@@ -42,7 +37,7 @@ Package.onTest(function(api) {
     'aldeed:collection2@2.9.1',
     'matb33:collection-hooks',
     'practicalmeteor:mocha',
-    'denormalized-views',
+    'thebarty:denormalized-views',
   ])
 
   api.mainModule('denormalized-views.tests.js');

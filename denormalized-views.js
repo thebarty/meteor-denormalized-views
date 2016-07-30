@@ -75,7 +75,9 @@ export const DenormalizedViews = class DenormalizedViews {
         userId,
         syncronisation: options,
       })
-      targetCollection.insert(doc)
+      DenormalizedViews._executeDatabaseComand(() => {
+        targetCollection.insert(doc)
+      })
     })
 
     sourceCollection.after.update(function(userId, doc, fieldNames, modifier) {
@@ -86,12 +88,16 @@ export const DenormalizedViews = class DenormalizedViews {
         syncronisation: options,
       })
 
-      targetCollection.update(doc._id, { $set: doc })
+      DenormalizedViews._executeDatabaseComand(() => {
+        targetCollection.update(doc._id, { $set: doc })
+      })
     })
 
     sourceCollection.after.remove(function(userId, doc) {
       debug(`${sourceCollection._name}.after.remove`)
-      targetCollection.remove(doc._id)
+      DenormalizedViews._executeDatabaseComand(() => {
+        targetCollection.remove(doc._id)
+      })
     })
   }
 
@@ -158,6 +164,15 @@ export const DenormalizedViews = class DenormalizedViews {
     })
   }
 
+  /**
+   * Manually refresh a set of Ids in an syncronisation
+   * for an given identifier.
+   *
+   * Use this in your App at places where a manual refresh is needed.
+   *
+   * @param  {Object} options [description]
+   * @return {[type]}         [description]
+   */
   static refreshManually(options = {}) {
     new SimpleSchema({
       identifier: { type: String },
@@ -166,9 +181,48 @@ export const DenormalizedViews = class DenormalizedViews {
 
     const { identifier, refreshIds } = options
 
-    // TODOD
+    if (refreshIds && refreshIds.length>0) {
+      DenormalizedViews._updateIds({
+        identifier,
+        idsToRefresh: refreshIds,
+      })
+    }
   }
 
+  /**
+   * Do a TOTAL refresh of the target-collection,
+   * meaning that ALL elements will get reloaded.
+   *
+   * In big collections this can bei
+   *
+   * @param  {[type]} identifier [description]
+   * @return {[type]}            [description]
+   */
+  static refreshAll(identifier) {
+    check(identifier, String)
+
+    const existingSyncronisation = DenormalizedViews._getExistingSyncronisation({ identifier })
+    debug(`refreshAll for collection "${existingSyncronisation.sourceCollection._name}"`)
+
+    DenormalizedViews._executeDatabaseComand(() => {
+      existingSyncronisation.targetCollection.remove({})
+    })
+
+    let ids = existingSyncronisation.sourceCollection.find({}, { fields: { '_id': 1 } }).fetch()
+    ids = _.pluck(ids, '_id')
+
+    for (const id of ids) {
+      let doc = existingSyncronisation.sourceCollection.findOne(id)
+      doc = DenormalizedViews._processDoc({
+        doc,
+        syncronisation: existingSyncronisation,
+      })
+      DenormalizedViews._executeDatabaseComand(() => {
+        existingSyncronisation.targetCollection.insert(doc)
+      })
+    }
+    debug(`${ids.length} docs in cache ${existingSyncronisation.targetCollection._name} were refreshed`)
+  }
 
   /**
    * Process a given doc by "sync"- and "postSync" options
@@ -246,8 +300,6 @@ export const DenormalizedViews = class DenormalizedViews {
       ))
     }
 
-    debug('doc AFTER process', doc)
-
     return doc
   }
 
@@ -279,7 +331,9 @@ export const DenormalizedViews = class DenormalizedViews {
         syncronisation: existingSyncronisation,
       })
 
-      existingSyncronisation.targetCollection.update(doc._id, { $set: doc })
+      DenormalizedViews._executeDatabaseComand(() => {
+        existingSyncronisation.targetCollection.update(doc._id, { $set: doc })
+      })
     }
   }
 
@@ -350,9 +404,30 @@ export const DenormalizedViews = class DenormalizedViews {
 
     const { _id, collection, property } = options
 
-    collection.update(_id, JSON.parse(`{ "$unset": { "${property}": 1 } }`))
+    DenormalizedViews._executeDatabaseComand(() => {
+      collection.update(_id, JSON.parse(`{ "$unset": { "${property}": 1 } }`))
+    })
   }
 
-
+  /**
+   * Execute a database command. If ``DeferWriteAccess=true```,
+   * wrap it into a ``Meteor.defer``, otherwise call it like any
+   * other command and give it more priority.
+   *
+   * @param  {[type]} aFunction [description]
+   * @return {[type]}          [description]
+   */
+  static _executeDatabaseComand(aFunction) {
+    if (DenormalizedViews.DeferWriteAccess) {
+      // good for mass-data
+      Meteor.defer(() => {
+        aFunction.call()
+      })
+    } else {
+      // high speed
+      aFunction.call()
+    }
+  }
 }
 DenormalizedViews.Debug = false
+DenormalizedViews.DeferWriteAccess = false
