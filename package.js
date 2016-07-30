@@ -12,12 +12,12 @@ Npm.depends({
 })
 
 Package.onUse(function(api) {
-  api.versionsFrom('1.3.5.1');
+  api.versionsFrom('1.3.5.1');  // todo: test if we can set versions down
   api.use([
     'check',
     'ecmascript',
-    'aldeed:simple-schema',
-    'matb33:collection-hooks',
+    'aldeed:simple-schema@1.5.3',  // todo: test if we can set versions down
+    'matb33:collection-hooks@0.8.3',  // todo: test if we can set versions down
   ])
   api.mainModule('denormalized-views.js');
 });
