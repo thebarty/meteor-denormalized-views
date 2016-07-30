@@ -1,4 +1,4 @@
-**WARNING: THIS IS AN EARLY RELEASE CANDIDATE. ALL TESTS PASS, BUT WE ARE LOOKING FOR FEEDBACK ON THIS TO MAKE IT 100% PRODUCTION STABLE. PLEASE TRY IT OUT AND GIVE US FEEDBACK!!!**
+**THIS IS AN EARLY RELEASE CANDIDATE. ALL TESTS PASS, BUT WE ARE LOOKING FOR FEEDBACK ON THIS TO MAKE IT 100% PRODUCTION STABLE. PLEASE TRY IT OUT AND GIVE US FEEDBACK!!!**
 
 # Denormalized Views for Meteor
 *thebarty:denormalized-views*
@@ -89,18 +89,22 @@ DenormalizedViews.addSyncronisation({
     // in here you define how the root of each sourceCollection-doc
     // will be extended. Think like in "SimpleSchema": Define a property
     // and assign it a function. The first parameter will be assigned the
-    // current sourceCollection-doc. Use it to collect the denormalized data
+    // current sourceCollection-doc, the second argument contains the current
+    // userId (when available). Use it to collect the denormalized data
     // and return it.
-    commentCache: (post) => {
+    commentsCache: (post, userId) => {
       const comments = []
       for (const commentId of post.commentIds) {
         const comment = Comments.findOne(commentId)
-        comments.add(comment)
+        comments.push(comment)
       }
       return comments
     },
-    authorCache: (post) => {
+    authorCache: (post, userId) => {
       return Authors.findOne(post.authorId)
+    },
+    categoryCache: (post, userId) => {
+      return Categories.findOne(post.categoryId)
     },
   },
   postSync: {
@@ -108,11 +112,15 @@ DenormalizedViews.addSyncronisation({
     // all ``sync``-properties have been loaded. The doc within the first 
     // parameter of the function will contain this data. This enables you
     // to created "joined"-fields and be creative...
-    wholeText: (post) => {
-      return `${post.text}, ${_.puck(post.commentCache, 'text').join(', ')}, ${post.authorCache.name}`
+    wholeText: (post, userId) => {
+      let authorText = ''
+      if (post.authorCache) {
+        authorText = post.authorCache.name
+      }
+      return `${post.text}, ${_.pluck(post.commentsCache, 'text').join(', ')}, ${authorText}`
     },
-    numberOfComments: (post) => {
-      return post.commentCache.length
+    numberOfComments: (post, userId) => {
+      return post.commentsCache.length
     },
   },
 })
@@ -140,10 +148,12 @@ Within the ``refreshIds``-parameters function it will pass you the doc (of the r
 DenormalizedViews.refreshByCollection({
   identifier: DENORMALIZED_POST_COLLECTION,
   triggerCollection: Authors,
-  refreshIds: (author) => {
-    // return _id-array of posts that should be updated
-    // return false or undefined to NOT sync
-    return Posts.find({ commentIds: { $in: author._id } })
+  refreshIds: (author, userId) => {
+    // return _id-array of posts that should be updated.
+    // Returning false, an empty array or undefined, 
+    // will simply not assign the property to the doc
+    const posts = Posts.find({ authorId: author._id }).fetch()
+    return _.pluck(posts, '_id')
   },
 })
 ```
@@ -158,7 +168,7 @@ There might be places where you want to manually refresh the view-colection, p.e
 //  p.e. from a ``Meteor.method``
 DenormalizedViews.refreshManually({
   identifier: DENORMALIZED_POST_COLLECTION, 
-  refreshIds: [Mongo._id]  // _id-array of posts that shoudl be updated
+  refreshIds: [Mongo._id],  // _id-array of posts that shoudl be updated
 })
 ```
 
@@ -170,6 +180,7 @@ If you ever want to manually refresh the whole view collection, you can use ``re
 **Note that this is the slowest option, because the whole table will be refreshed.**
 
 ```js
+// simply pass the identifier
 DenormalizedViews.refreshAll(DENORMALIZED_POST_COLLECTION)
 ```
 
