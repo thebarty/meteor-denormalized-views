@@ -4,7 +4,7 @@
 # Denormalized Views for Meteor
 *thebarty:denormalized-views*
 
-A toolkit that helps you to create "readonly" denormalized mongo-"views" (collections), which are especially useful for searchable UI-tables, or other read-heavy scenarios (*see "[Example Use-Case](#example-use-case)" for a quick overview*).
+A toolkit that helps you to create "readonly" denormalized mongo-"views" (collections), which are especially useful for searchable tables, or other read-heavy scenarios (*see "[Example Use-Case](#example-use-case)" for a quick overview*).
 
 The resulting "view"-collection can then be used with tools like ``aldeed:tabular``, or ``easy:search`` to display and search related data.
 
@@ -31,13 +31,13 @@ Additionally you can hookup "related"-collections to automatically refresh the "
 # Example Use-Case
 
 Let's say you have 3 collections:
- * Posts (relate to 1 author PLUS multiple comments)
+ * Posts (relate to 1 author & multiple comments)
  * Comments (relate to 1 post)
  * Authors (relate to multiple posts)
 
 ![chained denormalizations](https://github.com/thebarty/meteor-denormalized-views/blob/master/docs/data-schema.jpg)
 
-In your app you wnat to show a list of posts and give the user the option to search by the following:
+In your app you want to show a list of posts **with infos about their related authors and comments**. Additionally you want to give the user the option **to search** by the following:
 - search the post-text (field "text" in collection "Posts")
 - search the comment-text (field "text" in collection "Comments")
 - search the author-name (field "name" in collection "Author")
@@ -125,11 +125,11 @@ Within the ``refreshIds``-parameters function it will pass you the doc (of the r
 DenormalizedViews.refreshByCollection({
   identifier: DENORMALIZED_POST_COLLECTION,
   triggerCollection: Authors,
-  refreshIds: (doc) {
+  refreshIds: (author) => {
     // return _id-array of posts that should be updated
     // return false or undefined to NOT sync
-    return Posts.find({})
-  }
+    return Posts.find({ commentIds: { $in: author._id } })
+  },
 })
 ```
 
@@ -157,6 +157,34 @@ If you ever want to manually refresh the whole view collection, you can use ``re
 ```js
 DenormalizedViews.refreshAll(DENORMALIZED_POST_COLLECTION)
 ```
+
+
+## Remove a syncronisation ``remove()``
+
+If you ever want to disable a syncronisation, you can use ``remove()``.
+
+*This function is here to simplify testing. You probably do NOT need it in your app.*
+
+```js
+DenormalizedViews.remove(DENORMALIZED_POST_COLLECTION)
+```
+
+# Debug mode ``DenormalizedViews.Debug = true``
+
+```js
+import { DenormalizedViews } from 'meteor/denormalized-views'
+// enable logs
+DenormalizedViews.Debug = true
+```
+
+# How to contribute to this package
+
+Lets make this perfect and collaborate. This is how to set up your local testing environment:
+ 1. run "meteor create whatever; cd whatever; mkdir packages;"
+ 2. copy this package into the packages dir, p.e. "./whatever/packages/denormalized-views"
+ 3. run tests from the root (/whatever/.) of your project like ``meteor test-packages ./packages/denormalized-views/ --driver-package practicalmeteor:mocha``
+ 4. develop, write tests, and submit a pull request
+
 
 # TODOS:
  * write tests

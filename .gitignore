@@ -1,0 +1,36 @@
+#Meteor
+.npm/
+node_modules
+npm-debug.log
+*/.meteor/dev_bundle
+*/.meteor/local
+*.swp
+.meteor-spk
+.tx/
+*.sublime-workspace
+tmp/
+
+# SublimeText
+*.tmlanguage.cache
+*.tmPreferences.cache
+*.stTheme.cache
+
+# LOGS
+*.log
+
+# PyCharm
+.idea
+.idea/
+
+# OSX
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Files that might appear on external disk
+.Spotlight-V100
+.Trashes
+
+# SublimeText project files
+*.sublime-workspace
+*.sublime-project
