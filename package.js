@@ -1,6 +1,6 @@
 Package.describe({
   name: 'thebarty:denormalized-views',
-  version: '0.0.1',
+  version: '0.0.2',
   summary: 'Easily create "readonly" denormalized mongo-"views" (collections), p.e. for searchable tables',
   git: 'https://github.com/thebarty/meteor-denormalized-views',
   documentation: 'README.md'
