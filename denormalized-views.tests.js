@@ -36,7 +36,7 @@ Categories.attachSchema(new SimpleSchema({
   },
   postId: {
     type: String,
-  }
+  },
 }))
 Posts.attachSchema(new SimpleSchema({
   text: {
@@ -205,14 +205,14 @@ if (Meteor.isServer) {
     it('CollectionHooks-package allows us to instanciate multiple hook-functions. All hooks defined hook-functions will be run.', function () {
       // define 2 hooks to test if they are both run
       HookTestCollection.after.insert(function (userId, doc) {
-        HookTestCollection.update(doc._id.insertedIds[0], { $set: { insertHook1: 'insertHook1 was here' } })
+        HookTestCollection.update(doc._id, { $set: { insertHook1: 'insertHook1 was here' } })
       })
       HookTestCollection.after.insert(function (userId, doc) {
-        HookTestCollection.update(doc._id.insertedIds[0], { $set: { insertHook2: 'insertHook2 was here' } })
+        HookTestCollection.update(doc._id, { $set: { insertHook2: 'insertHook2 was here' } })
       })
       // do an insert, to trigger the hooks
       const docId = HookTestCollection.insert({
-        test: 'test insert'
+        test: 'test insert',
       })
       // check
       const doc = HookTestCollection.findOne(docId)

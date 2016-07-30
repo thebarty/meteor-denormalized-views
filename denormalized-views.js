@@ -69,7 +69,7 @@ export const DenormalizedViews = class DenormalizedViews {
     sourceCollection.after.insert(function(userId, doc) {
       debug(`${sourceCollection._name}.after.insert`)
       // fix for insert-hook
-      doc._id = doc._id.insertedIds[0]
+      // doc._id = doc._id.insertedIds[0]
       doc = DenormalizedViews._processDoc({
         doc,
         userId,
@@ -126,7 +126,7 @@ export const DenormalizedViews = class DenormalizedViews {
 
     triggerCollection.after.insert(function(userId, doc) {
       debug(`triggerCollection ${triggerCollection._name}.after.insert`)
-      doc._id = doc._id.insertedIds[0]  // fix for insert-hook
+      // doc._id = doc._id.insertedIds[0]  // fix for insert-hook
       const ids = DenormalizedViews._validateAndCallRefreshIds({ doc, refreshIds, userId })
       if (ids && ids.length>0) {
         DenormalizedViews._updateIds({
