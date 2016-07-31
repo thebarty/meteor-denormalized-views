@@ -18,7 +18,7 @@ export const ERROR_SOURCE_AND_TARGET_COLLECTIONS_NEED_TO_BE_DIFFERENT = 'sourceC
 export const ERROR_SYNC_NEEDS_TO_HAVE_CONTENT = 'sync needs to have properties attached'
 export const ERROR_SYNC_ALREADY_EXISTS_FOR_SOURCE_TARGET_COLLECTIONS = 'a sync already exists for the given sourceCollection and viewCollection'
 export const ERROR_REFRESH_BY_COLLECTION_CAN_NOT_BE_SET_TO_SOURCE_COLLECTION = 'relatedCollection can NOT be set to sourceCollection or viewCollection. It is meant to be registered to a related collection.'
-export const ERROR_REFRESH_BY_COLLECTION_NEEDS_TO_BE_ASSIGNED_TO_AN_EXISTING_ID = 'identifier in refreshByCollection() needs to be a registered syncronisation. It has to be registered before via addSyncronisation()'
+export const ERROR_REFRESH_BY_COLLECTION_NEEDS_TO_BE_ASSIGNED_TO_AN_EXISTING_ID = 'identifier in refreshByCollection() needs to be a registered syncronisation. It has to be registered before via addView()'
 
 // Storage for ALL system-wide syncronisations
 export const SyncronisationStore = []
@@ -30,7 +30,7 @@ export const DenormalizedViews = class DenormalizedViews {
   // ================================================
   // PUBLIC API (to be used from outside)
 
-  static addSyncronisation(options = {}) {
+  static addView(options = {}) {
     new SimpleSchema({
       identifier: { type: String },
       sourceCollection: { type: Mongo.Collection },
@@ -61,7 +61,7 @@ export const DenormalizedViews = class DenormalizedViews {
       throw new Error(ERROR_SYNC_ALREADY_EXISTS_FOR_SOURCE_TARGET_COLLECTIONS)
     }
     // is valid? Register it
-    debug(`addSyncronisation from sourceCollection "${sourceCollection._name}" to "${viewCollection._name}"`)
+    debug(`addView from sourceCollection "${sourceCollection._name}" to "${viewCollection._name}"`)
     SyncronisationStore.push(options)
 
     // register hooks to sourceCollection
@@ -136,6 +136,8 @@ export const DenormalizedViews = class DenormalizedViews {
           identifier,
           idsToRefresh: ids,
         })
+      } else {
+        debug('no _ids received from refreshIds-function. So NO docs will be updated in "view"-collection')
       }
     })
 
@@ -147,6 +149,8 @@ export const DenormalizedViews = class DenormalizedViews {
           identifier,
           idsToRefresh: ids,
         })
+      } else {
+        debug('no _ids received from refreshIds-function. So NO docs will be updated in "view"-collection')
       }
     })
 
@@ -163,6 +167,8 @@ export const DenormalizedViews = class DenormalizedViews {
           identifier,
           idsToRefresh: ids,
         })
+      } else {
+        debug('no _ids received from refreshIds-function. So NO docs will be updated in "view"-collection')
       }
     })
   }
@@ -244,7 +250,7 @@ export const DenormalizedViews = class DenormalizedViews {
     }).validate(options)
 
     const { syncronisation, userId } = options
-    const { sourceCollection, viewCollection, sync, postSync, pick } = syncronisation
+    const { viewCollection, sync, postSync, pick } = syncronisation
     let doc = options.doc
 
     // Loop each property set in "sync"

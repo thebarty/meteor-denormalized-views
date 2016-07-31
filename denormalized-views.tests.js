@@ -60,7 +60,7 @@ Posts.attachSchema(new SimpleSchema({
 
 // Identifier allow you to add MULTIPLE view to one single collection
 const DENORMALIZED_POST_COLLECTION = 'DENORMALIZED_POST_COLLECTION'
-DenormalizedViews.addSyncronisation({
+DenormalizedViews.addView({
   identifier: DENORMALIZED_POST_COLLECTION,
   sourceCollection: Posts,
   viewCollection: PostsDenormalizedView,
@@ -233,9 +233,9 @@ if (Meteor.isServer) {
     // INSERT
     // UPDATE
     // REMOVE
-    it('.addSyncronisation does validate options correctly', function () {
+    it('.addView does validate options correctly', function () {
       expect(() => {
-        DenormalizedViews.addSyncronisation({
+        DenormalizedViews.addView({
           identifier: DENORMALIZED_POST_COLLECTION,  // duplicate id
           sourceCollection: Posts,
           viewCollection: PostsDenormalizedView,
@@ -244,7 +244,7 @@ if (Meteor.isServer) {
       }).to.throw(ERROR_IDENTIFIERT_EXISTS)
 
       expect(() => {
-        DenormalizedViews.addSyncronisation({
+        DenormalizedViews.addView({
           identifier: 'unique',
           sourceCollection: Posts,  // same collection
           viewCollection: Posts,  // same collection
@@ -253,7 +253,7 @@ if (Meteor.isServer) {
       }).to.throw(ERROR_SOURCE_AND_TARGET_COLLECTIONS_NEED_TO_BE_DIFFERENT)
 
       expect(() => {
-        DenormalizedViews.addSyncronisation({
+        DenormalizedViews.addView({
           identifier: 'unique',
           sourceCollection: Posts,
           viewCollection: PostsDenormalizedView,
@@ -264,7 +264,7 @@ if (Meteor.isServer) {
       }).to.throw(ERROR_SYNC_NEEDS_TO_HAVE_CONTENT)
 
       expect(() => {
-        DenormalizedViews.addSyncronisation({
+        DenormalizedViews.addView({
           identifier: 'unique but combination already exists',
           sourceCollection: Posts,
           viewCollection: PostsDenormalizedView,
@@ -277,7 +277,7 @@ if (Meteor.isServer) {
       }).to.throw(ERROR_SYNC_ALREADY_EXISTS_FOR_SOURCE_TARGET_COLLECTIONS)
     })
 
-    it('.addSyncronisation works as expected on INSERTS on viewCollection', function () {
+    it('.addView works as expected on INSERTS on viewCollection', function () {
       const fixtures = setupFixtures()  // inserts happen here
       validateFixtures()
 
@@ -290,7 +290,7 @@ if (Meteor.isServer) {
       expect(postDenormalized1.wholeText).to.equal('post 1, comment 1, author 1')
       expect(postDenormalized1.numberOfComments).to.equal(1)
     })
-    it('.addSyncronisation works as expected on UPDATES on viewCollection', function () {
+    it('.addView works as expected on UPDATES on viewCollection', function () {
       const fixtures = setupFixtures()
       validateFixtures()
 
@@ -306,7 +306,7 @@ if (Meteor.isServer) {
       expect(postDenormalized1.wholeText).to.equal('post 1 newtext, comment 2, comment 3, author 2')
       expect(postDenormalized1.numberOfComments).to.equal(2)
     })
-    it('.addSyncronisation works as expected on REMOVES on viewCollection', function () {
+    it('.addView works as expected on REMOVES on viewCollection', function () {
       const fixtures = setupFixtures()
       validateFixtures()
 
