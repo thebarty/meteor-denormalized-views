@@ -1,4 +1,4 @@
-import { DenormalizedViews } from 'meteor/thebarty:denormalized-views'
+import { DenormalizedViews } from './denormalized-views.js'
 
 /**
  * [debug description]

@@ -1,9 +1,9 @@
 Package.describe({
   name: 'thebarty:denormalized-views',
-  version: '0.0.3',
+  version: '0.0.4',
   summary: 'Easily create "readonly" denormalized mongo-"views" (collections), p.e. for searchable tables',
   git: 'https://github.com/thebarty/meteor-denormalized-views',
-  documentation: 'README.md'
+  documentation: 'README.md',
 });
 
 Npm.depends({
@@ -12,12 +12,12 @@ Npm.depends({
 })
 
 Package.onUse(function(api) {
-  api.versionsFrom('1.3.5.1');  // todo: test if we can set versions down
+  api.versionsFrom('1.3.1');  // todo: test if we can set versions down
   api.use([
     'check',
     'ecmascript',
-    'aldeed:simple-schema@1.5.3',  // todo: test if we can set versions down
-    'matb33:collection-hooks@0.8.3',  // todo: test if we can set versions down
+    'aldeed:simple-schema@1.5.1',  // todo: test if we can set versions down
+    'matb33:collection-hooks@0.7.15',  // todo: test if we can set versions down
   ])
   api.mainModule('denormalized-views.js');
 });

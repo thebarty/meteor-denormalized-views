@@ -71,7 +71,7 @@ You know that ``aldeed:tabular`` is a great package to list a collection in the 
 
 Use ``addSyncronisation()`` to define how your "view"-collection collects its data. It all starts at the "source"-collection (p.e. Posts): **data of the "source"-collection will automatically be copied 1-to-1 to the "view"-collection** (= the "view"-collection). Scroll down to see the first code.
 
-**Behind the scenes**
+## Behind the scenes
 The concept is that your "source"-collection is **writable**, while your "view"-collection is **read-only**. DO NOT write to your "view"-collection - otherwise data will get out of sync!
 
 **The synchronization is "one way"** and will run anytime the "source"-collection receives an Mongo- ``insert``, ``update`` or ``remove``-command. The effected docs will then process via your ``sync:``- && ``postSync``-definitions and stored to the "view"-collection.
@@ -87,10 +87,11 @@ Within the ``sync``-property you **extend the target document** and hand each ne
 ```js
 const IDENTIFIER = 'identifier' // unique id
 
+const PostsDenormalizedView = new Mongo.Collection('postsdenormalizedview')
 DenormalizedViews.addSyncronisation({
-  identifier: IDENTIFIER,  
+  identifier: IDENTIFIER,
   sourceCollection: Posts,
-  viewCollection: PostsDenormalized,
+  viewCollection: PostsDenormalizedView,
   sync: {
     // In here you extend the targetDoc:
     // Simply define a property and assign it a function. 
@@ -149,7 +150,7 @@ By default the whole doc from your "source"-collection will be copied to "view"-
 DenormalizedViews.addSyncronisation({
   identifier: IDENTIFIER,
   sourceCollection: Posts,
-  viewCollection: PostsDenormalized,
+  viewCollection: PostsDenormalizedView,
   pick: ['text'],  // (optional) set to pick specific fields
   								 // from sourceCollection
   // continue with
@@ -163,9 +164,9 @@ DenormalizedViews.addSyncronisation({
 
 If within your app you only write to "source"-collection, that is all you have to do, because by setting up ``addSyncronisation`` you enabled the automatic synchronization between "source"-Collection and "view"-collection.
 
-**BUT** changes made to other "related"-collections will potentially invalidate data within your "view"-collection. In our example that would happen when you update ``Authors.name``. *(p.e. ``PostsDenormalized.authorsCache.name`` will then contain the wrong old name)*
+**BUT** changes made to other "related"-collections will potentially invalidate data within your "view"-collection. In our example that would happen when you update ``Authors.name``. *(p.e. ``PostsDenormalizedView.authorsCache.name`` will then contain the wrong old name)*
 
-There are **2 options to keep your the "view"-collection in sync with "related"-collection**:
+There are **2 options to keep the "view"-collection in sync with "related"-collection**:
  1. hook up the **"related"-collection** via ``refreshByCollection()`` and let this package to the rest
  2. do it **manually** via ``refreshManually(identifier)``
 
@@ -248,10 +249,11 @@ DenormalizedViews.DeferWriteAccess = true
 import { DenormalizedViews } from 'thebarty:denormalized-views'
 
 const IDENTIFIER = 'identifier' // unique id
+const PostsDenormalizedView = new Mongo.Collection('postsdenormalizedview')
 DenormalizedViews.addSyncronisation({
   identifier: IDENTIFIER,  // unique id for synchronization
   sourceCollection: Posts,
-  viewCollection: PostsDenormalized,
+  viewCollection: PostsDenormalizedView,
   pick: ['text'],  // (optional) 
   sync: {
     authorCache: (post, userId) => {
