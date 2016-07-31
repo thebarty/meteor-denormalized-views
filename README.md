@@ -3,13 +3,13 @@
 # Denormalized Views for Meteor
 *thebarty:denormalized-views*
 
-A toolkit that helps you to create "readonly" denormalized mongo-"views" (collections), which are especially useful for searchable tables, or other read-heavy scenarios (*see "[Example Use-Case](#example-use-case)" for a quick overview*).
+A toolkit that helps you to create "read-only" denormalized mongo-"views" (collections), which are especially useful for search-able tables, or other read-heavy scenarios (*see "[Example Use-Case](#example-use-case)" for a quick overview*).
 
 The resulting "view"-collection can then be used with tools like ``aldeed:tabular``, or ``easy:search`` to display and search related data.
 
-Simply define how the data shall be collected based on a "source"-collection. Whenver a change happens in "source"-collection (insert | update | remove), the "view"-collection will automatically be refreshed. 
+Simply define how the data shall be collected based on a "source"-collection. Whenever a change happens in "source"-collection (insert | update | remove), the "view"-collection will automatically be refreshed. 
 
-Additionally you can hookup "related"-collections to automatically refresh the "source"-collection or trigger manual refreshes (*if neccessary at all*).
+Additionally you can hookup "related"-collections to automatically refresh the "source"-collection or trigger manual refreshes (*if necessary at all*).
 
 
 # Table of Contents
@@ -20,12 +20,16 @@ Additionally you can hookup "related"-collections to automatically refresh the "
 - [Installation](#installation)
 - [Example Use-Case](#example-use-case)
 - [Setup by ``addSyncronisation()``](#setup-by-addsyncronisation)
+  - [Denormalize via ``sync:``](#denormalize-via-sync)
+  - [Create "joined search fields" via ``postSync:``](#create-joined-search-fields-via-postsync)
+  - [Pick the fields you need via ``pick()``](#pick-the-fields-you-need-via-pick)
 - [Staying in sync](#staying-in-sync)
-  - [**Automatically** refresh by related collections (``refreshByCollection()``)](#automatically-refresh-by-related-collections-refreshbycollection)
+  - [**Automatically** synchronize "related"-collections (``refreshByCollection()``)](#automatically-synchronize-related-collections-refreshbycollection)
   - [**Manually** refreshing **individual** docs (``refreshManually()``)](#manually-refreshing-individual-docs-refreshmanually)
   - [**Manually** refreshing the **whole** collection (``refreshAll()``)](#manually-refreshing-the-whole-collection-refreshall)
 - [Debug mode ``DenormalizedViews.Debug = true``](#debug-mode-denormalizedviewsdebug--true)
 - [Defer syncing via ``DenormalizedViews.DeferWriteAccess``](#defer-syncing-via-denormalizedviewsdeferwriteaccess)
+- [A full example containing all options](#a-full-example-containing-all-options)
 - [Open Todos](#open-todos)
 - [How to contribute to this package](#how-to-contribute-to-this-package)
 - [Research Resources](#research-resources)
@@ -49,49 +53,59 @@ Let's say you have 3 collections:
  * Comments (relate to 1 post)
  * Authors (relate to multiple posts)
 
-![chained denormalizations](https://github.com/thebarty/meteor-denormalized-views/blob/master/docs/data-schema.jpg)
+![data schema](https://github.com/thebarty/meteor-denormalized-views/blob/master/docs/data-schema.jpg)
 
 In your app you want to show a list of posts **with infos about their related authors and comments**. Additionally you want to give the user the option **to search** by the following:
 - search the post-text (field "text" in collection "Posts")
 - search the comment-text (field "text" in collection "Comments")
 - search the author-name (field "name" in collection "Author")
 
-![chained denormalizations](https://github.com/thebarty/meteor-denormalized-views/blob/master/docs/user-interface.jpg)
+![user interface](https://github.com/thebarty/meteor-denormalized-views/blob/master/docs/user-interface.jpg)
 
-You know that ``aldeed:tabular`` is a great package to list a collection in the frontent. Altough it can easily show joined collection thru a package like ``reywood:publish-composite``, it does NOT support search over joined collections. **Here is where ``denormalized-views`` comes into play**: simply create a denormalized "view"-collection and use it to display and search data thru tabular.
+You know that ``aldeed:tabular`` is a great package to list a collection in the frontend. Although it can easily show joined collection thru a package like ``reywood:publish-composite``, it does NOT support search over joined collections. **Here is where ``denormalized-views`` comes into play**: simply create a denormalized "view"-collection and use it to display and search data thru tabular.
 
 
 # Setup by ``addSyncronisation()``
 
-Use ``addSyncronisation()`` to define how your view-collection collects its data. It all starts at the "sourceCollection" (p.e. Posts) - data of the sourceCollection will be copied 1-to-1 to the targetCollection (= the view-collection). 
+**NOTE: The package API needs to be run on the server!** *The client will then receive new data via pub/sub*
 
-In the ``sync``-property you extend the target document and hand each new property a function to collect the denormalized data and return it. 
+Use ``addSyncronisation()`` to define how your "view"-collection collects its data. It all starts at the "source"-collection (p.e. Posts): **data of the "source"-collection will automatically be copied 1-to-1 to the "view"-collection** (= the "view"-collection). Scroll down to see the first code.
 
-There is also a ``postSync`` property, which acts the same as ``sync``, but is run **after** ``sync`` has collected the data, meaning that the passed doc will already contain the collected data. You can use ``postSync`` to create joined search fields.
+**Behind the scenes**
+The concept is that your "source"-collection is **writable**, while your "view"-collection is **read-only**. DO NOT write to your "view"-collection - otherwise data will get out of sync!
 
-*Behing the scenes*
-*The package will run this ``sync``-process anytime the sourceCollection receives an Mongo- ``insert``, ``update`` or ``remove``-command. ``insert``- and ``update``-commands will put the doc thru ``sync`` && ``postSync`` and transfer the resulting doc into targetCollection. Of course the ``_id`` will be the same in both collections. A ``remove`` will remove the doc from targetCollection.*
+**The synchronization is "one way"** and will run anytime the "source"-collection receives an Mongo- ``insert``, ``update`` or ``remove``-command. The effected docs will then process via your ``sync:``- && ``postSync``-definitions and stored to the "view"-collection.
 
+Of course the ``_id`` will be the same in both collections. A ``remove`` on the "source"-collection will remove the doc from "view"-collection.
 
-**Start by defining your syncronization:**
+## Denormalize via ``sync:``
+
+Within the ``sync``-property you **extend the target document** and hand each new property a function to collect the denormalized data and return it. 
+
+**Start by defining your synchronization:**
 
 ```js
-const DENORMALIZED_POST_COLLECTION = 'DENORMALIZED_POST_COLLECTION'
+const IDENTIFIER = 'identifier' // unique id
 
 DenormalizedViews.addSyncronisation({
-  identifier: DENORMALIZED_POST_COLLECTION,  // unique id for syncronisation
+  identifier: IDENTIFIER,  
   sourceCollection: Posts,
-  targetCollection: PostsDenormalized,
-  pick: ['text'],  // (optional) 
-                   // If NOT set, all properties of the sourceCollection-doc will be synced to targetCollection. 
-                   // If SET, only the specified fields will be picked.
+  viewCollection: PostsDenormalized,
   sync: {
-    // in here you define how the root of each sourceCollection-doc
-    // will be extended. Think like in "SimpleSchema": Define a property
-    // and assign it a function. The first parameter will be assigned the
-    // current sourceCollection-doc, the second argument contains the current
-    // userId (when available). Use it to collect the denormalized data
+    // In here you extend the targetDoc:
+    // Simply define a property and assign it a function. 
+    // Collection the data within this function
     // and return it.
+    // 
+    // The function will be passed 2 parameters:
+    //  1) the current doc of the "source"-Collection 
+    //  2) the current userId (when available)
+    authorCache: (post, userId) => {
+      return Authors.findOne(post.authorId)
+    },
+    categoryCache: (post, userId) => {
+      return Categories.findOne(post.categoryId)
+    },
     commentsCache: (post, userId) => {
       const comments = []
       for (const commentId of post.commentIds) {
@@ -100,18 +114,20 @@ DenormalizedViews.addSyncronisation({
       }
       return comments
     },
-    authorCache: (post, userId) => {
-      return Authors.findOne(post.authorId)
-    },
-    categoryCache: (post, userId) => {
-      return Categories.findOne(post.categoryId)
-    },
   },
+})
+```
+
+## Create "joined search fields" via ``postSync:``
+
+There is also a ``postSync:`` property, which acts the same as ``sync:``, but is run **after** ``sync:`` has collected the data, meaning that the passed doc will already contain the new properties from ``sync:``. You can use ``postSync:`` to create joined search fields or get creative.
+
+```js
+	// ... continuing the example from above
   postSync: {
-    // similar to ``sync`` with the difference, that it will be run AFTER
-    // all ``sync``-properties have been loaded. The doc within the first 
-    // parameter of the function will contain this data. This enables you
-    // to created "joined"-fields and be creative...
+    // This will be called AFTER ``sync:`` has attached 
+    // new data to the doc, so you can use this to create
+    // joined search fields, or get creative.
     wholeText: (post, userId) => {
       let authorText = ''
       if (post.authorCache) {
@@ -123,35 +139,56 @@ DenormalizedViews.addSyncronisation({
       return post.commentsCache.length
     },
   },
+```
+
+## Pick the fields you need via ``pick()``
+
+By default the whole doc from your "source"-collection will be copied to "view"-collection. If you want to **restrict** the fields being copied you can use the ``pick``-option:
+
+```js
+DenormalizedViews.addSyncronisation({
+  identifier: IDENTIFIER,
+  sourceCollection: Posts,
+  viewCollection: PostsDenormalized,
+  pick: ['text'],  // (optional) set to pick specific fields
+  								 // from sourceCollection
+  // continue with
+  // ... sync:
+  // ... postSync:
 })
 ```
 
 
 # Staying in sync
 
-If within your app you only write to ``sourceCollection``, that is all you have to do. 
+If within your app you only write to "source"-collection, that is all you have to do, because by setting up ``addSyncronisation`` you enabled the automatic synchronization between "source"-Collection and "view"-collection.
 
-BUT there will probably be places in your app, where you know that data within the view-collection gets invalidated (=out of sync) and you want to refresh it, p.e. when you update ``Authors.name``.
+**BUT** changes made to other "related"-collections will potentially invalidate data within your "view"-collection. In our example that would happen when you update ``Authors.name``. *(p.e. ``PostsDenormalized.authorsCache.name`` will then contain the wrong old name)*
 
-There are 2 options to refresh the view-collection:
- 1. hook up the **related collection** via ``refreshByCollection()`` and let this package to the rest
- 2. do it **manually** via ``refreshManually(ID)``
+There are **2 options to keep your the "view"-collection in sync with "related"-collection**:
+ 1. hook up the **"related"-collection** via ``refreshByCollection()`` and let this package to the rest
+ 2. do it **manually** via ``refreshManually(identifier)``
 
+Start with option 1) and use option 2) if needed at all.
 
-## **Automatically** refresh by related collections (``refreshByCollection()``)
+## **Automatically** synchronize "related"-collections (``refreshByCollection()``)
 
-If you know that the ``targetCollection`` will always need to refresh, whenever a related collection (p.e. Authors) changes, use the ``refreshByCollection()`` function to trigger it. 
+Setup a ``refreshByCollection()`` to automatically synchronize changes made to a "related"-collection. Your task in here is to tell the "view"-collection which _ids shall be refreshed:
 
-Within the ``refreshIds``-parameters function it will pass you the doc (of the related-collection) and ask you to **return an array of ``Mongo refreshIds`` of the sourceCollection-docs that should be refreshed**. If you return false, undefined or null a refresh will NOT be triggered.
+Within the ``refreshIds``-parameter's function **return an array of ``_ids``**. Those _ids will then be refreshed within "view"-collection. The first parameter in this function gives you the current doc change in the "related"-collection. 
+
+If you return false, undefined or null a refresh will NOT be triggered.
 
 ```js
 DenormalizedViews.refreshByCollection({
-  identifier: DENORMALIZED_POST_COLLECTION,
-  triggerCollection: Authors,
+  identifier: IDENTIFIER,
+  relatedCollection: Authors,
   refreshIds: (author, userId) => {
-    // return _id-array of posts that should be updated.
-    // Returning false, an empty array or undefined, 
-    // will simply not assign the property to the doc
+  	// The first parameter is the current doc changed within
+  	// the "related"-collection.
+    // Return an array of _ids that should be updated in "view"-collection.
+    // Returning false, an empty array or undefined, will simply 
+    // not refresh anything.
     const posts = Posts.find({ authorId: author._id }).fetch()
     return _.pluck(posts, '_id')
   },
@@ -161,14 +198,14 @@ DenormalizedViews.refreshByCollection({
 
 ## **Manually** refreshing **individual** docs (``refreshManually()``)
 
-There might be places where you want to manually refresh the view-colection, p.e. in a ``Meteor.method``. You can use ``refreshManually()`` to do so:
+There might be places where you want to manually refresh the "view"-collection, p.e. in a ``Meteor.method``. You can use ``refreshManually()`` to do so:
 
 ```js
 // this is the manual way of doing it,
 //  p.e. from a ``Meteor.method``
 DenormalizedViews.refreshManually({
-  identifier: DENORMALIZED_POST_COLLECTION, 
-  refreshIds: [Mongo._id],  // _id-array of posts that shoudl be updated
+  identifier: IDENTIFIER, 
+  refreshIds: [Mongo._id],  // _id-array of posts that should be updated
 })
 ```
 
@@ -181,7 +218,7 @@ If you ever want to manually refresh the whole view collection, you can use ``re
 
 ```js
 // simply pass the identifier
-DenormalizedViews.refreshAll(DENORMALIZED_POST_COLLECTION)
+DenormalizedViews.refreshAll(IDENTIFIER)
 ```
 
 
@@ -202,6 +239,49 @@ If you don't care about data being sync 100% real-time and want to relax the ser
 import { DenormalizedViews } from 'thebarty:denormalized-views'
 // enable Meteor.defer() for writes
 DenormalizedViews.DeferWriteAccess = true
+```
+
+
+# A full example containing all options
+
+```js
+import { DenormalizedViews } from 'thebarty:denormalized-views'
+
+const IDENTIFIER = 'identifier' // unique id
+DenormalizedViews.addSyncronisation({
+  identifier: IDENTIFIER,  // unique id for synchronization
+  sourceCollection: Posts,
+  viewCollection: PostsDenormalized,
+  pick: ['text'],  // (optional) 
+  sync: {
+    authorCache: (post, userId) => {
+      return Authors.findOne(post.authorId)
+    },
+    categoryCache: (post, userId) => {
+      return Categories.findOne(post.categoryId)
+    },
+    commentsCache: (post, userId) => {
+      const comments = []
+      for (const commentId of post.commentIds) {
+        const comment = Comments.findOne(commentId)
+        comments.push(comment)
+      }
+      return comments
+    },
+  },
+  postSync: {
+    wholeText: (post, userId) => {
+      let authorText = ''
+      if (post.authorCache) {
+        authorText = post.authorCache.name
+      }
+      return `${post.text}, ${_.pluck(post.commentsCache, 'text').join(', ')}, ${authorText}`
+    },
+    numberOfComments: (post, userId) => {
+      return post.commentsCache.length
+    },
+  },
+})
 ```
 
 

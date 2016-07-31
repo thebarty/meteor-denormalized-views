@@ -14,10 +14,10 @@ import { debug, extend } from './tools.js'
 
 // ERRORS (export needed for tests)
 export const ERROR_IDENTIFIERT_EXISTS = 'identifier already exists'
-export const ERROR_SOURCE_AND_TARGET_COLLECTIONS_NEED_TO_BE_DIFFERENT = 'sourceCollection and targetCollection need to refer to different collections'
+export const ERROR_SOURCE_AND_TARGET_COLLECTIONS_NEED_TO_BE_DIFFERENT = 'sourceCollection and viewCollection need to refer to different collections'
 export const ERROR_SYNC_NEEDS_TO_HAVE_CONTENT = 'sync needs to have properties attached'
-export const ERROR_SYNC_ALREADY_EXISTS_FOR_SOURCE_TARGET_COLLECTIONS = 'a sync already exists for the given sourceCollection and targetCollection'
-export const ERROR_REFRESH_BY_COLLECTION_CAN_NOT_BE_SET_TO_SOURCE_COLLECTION = 'triggerCollection can NOT be set to sourceCollection or targetCollection. It is meant to be registered to a related collection.'
+export const ERROR_SYNC_ALREADY_EXISTS_FOR_SOURCE_TARGET_COLLECTIONS = 'a sync already exists for the given sourceCollection and viewCollection'
+export const ERROR_REFRESH_BY_COLLECTION_CAN_NOT_BE_SET_TO_SOURCE_COLLECTION = 'relatedCollection can NOT be set to sourceCollection or viewCollection. It is meant to be registered to a related collection.'
 export const ERROR_REFRESH_BY_COLLECTION_NEEDS_TO_BE_ASSIGNED_TO_AN_EXISTING_ID = 'identifier in refreshByCollection() needs to be a registered syncronisation. It has to be registered before via addSyncronisation()'
 
 // Storage for ALL system-wide syncronisations
@@ -34,13 +34,13 @@ export const DenormalizedViews = class DenormalizedViews {
     new SimpleSchema({
       identifier: { type: String },
       sourceCollection: { type: Mongo.Collection },
-      targetCollection: { type: Mongo.Collection },
+      viewCollection: { type: Mongo.Collection },
       pick: { type: [String], optional: true },
       sync: { type: Object, blackbox: true },
       postSync: { type: Object, blackbox: true, optional: true },
     }).validate(options)
 
-    const { identifier, sourceCollection, targetCollection, pick, sync, postSync } = options
+    const { identifier, sourceCollection, viewCollection, pick, sync, postSync } = options
 
     // Validate options
     // validate that identifier is NOT yet registered
@@ -48,7 +48,7 @@ export const DenormalizedViews = class DenormalizedViews {
       throw new Error(`${ERROR_IDENTIFIERT_EXISTS}: ${identifier}`)
     }
     // validate that collections are NOT the same
-    if (sourceCollection===targetCollection) {
+    if (sourceCollection===viewCollection) {
       throw new Error(ERROR_SOURCE_AND_TARGET_COLLECTIONS_NEED_TO_BE_DIFFERENT)
     }
     if (_.isEmpty(sync)) {
@@ -56,16 +56,16 @@ export const DenormalizedViews = class DenormalizedViews {
     }
     if (_.find(SyncronisationStore, (store) => {
             return (store.sourceCollection===sourceCollection
-              && store.targetCollection===targetCollection)
+              && store.viewCollection===viewCollection)
        })) {
       throw new Error(ERROR_SYNC_ALREADY_EXISTS_FOR_SOURCE_TARGET_COLLECTIONS)
     }
     // is valid? Register it
-    debug(`addSyncronisation from sourceCollection "${sourceCollection._name}" to "${targetCollection._name}"`)
+    debug(`addSyncronisation from sourceCollection "${sourceCollection._name}" to "${viewCollection._name}"`)
     SyncronisationStore.push(options)
 
     // register hooks to sourceCollection
-    // those hooks wil sync to targetCollection
+    // those hooks wil sync to viewCollection
     sourceCollection.after.insert(function(userId, doc) {
       debug(`${sourceCollection._name}.after.insert`)
       // fix for insert-hook
@@ -76,7 +76,8 @@ export const DenormalizedViews = class DenormalizedViews {
         syncronisation: options,
       })
       DenormalizedViews._executeDatabaseComand(() => {
-        targetCollection.insert(doc)
+        debug(`inserting doc with id ${doc._id}`)
+        viewCollection.insert(doc)
       })
     })
 
@@ -89,14 +90,16 @@ export const DenormalizedViews = class DenormalizedViews {
       })
 
       DenormalizedViews._executeDatabaseComand(() => {
-        targetCollection.update(doc._id, { $set: doc })
+        debug(`updating doc with id ${doc._id}`)
+        viewCollection.update(doc._id, { $set: doc })
       })
     })
 
     sourceCollection.after.remove(function(userId, doc) {
       debug(`${sourceCollection._name}.after.remove`)
       DenormalizedViews._executeDatabaseComand(() => {
-        targetCollection.remove(doc._id)
+        debug(`removing doc with id ${doc._id}`)
+        viewCollection.remove(doc._id)
       })
     })
   }
@@ -104,11 +107,11 @@ export const DenormalizedViews = class DenormalizedViews {
   static refreshByCollection(options = {}) {
     new SimpleSchema({
       identifier: { type: String },
-      triggerCollection: { type: Mongo.Collection },
+      relatedCollection: { type: Mongo.Collection },
       refreshIds: { type: Function },
     }).validate(options)
 
-    const { identifier, triggerCollection, refreshIds } = options
+    const { identifier, relatedCollection, refreshIds } = options
 
     // Validate
     const existingSyncronisation = DenormalizedViews._getExistingSyncronisation({ identifier })
@@ -117,15 +120,15 @@ export const DenormalizedViews = class DenormalizedViews {
       throw new Error(ERROR_REFRESH_BY_COLLECTION_NEEDS_TO_BE_ASSIGNED_TO_AN_EXISTING_ID)
     }
     // validate that we have a valid collection assigned
-    if (existingSyncronisation.sourceCollection===triggerCollection
-      || existingSyncronisation.targetCollection===triggerCollection) {
+    if (existingSyncronisation.sourceCollection===relatedCollection
+      || existingSyncronisation.viewCollection===relatedCollection) {
       throw new Error(ERROR_REFRESH_BY_COLLECTION_CAN_NOT_BE_SET_TO_SOURCE_COLLECTION)
     }
 
-    debug(`setup refreshByCollection for identifier "${identifier}" and triggerCollection "${triggerCollection._name}"`)
+    debug(`setup refreshByCollection for identifier "${identifier}" and relatedCollection "${relatedCollection._name}"`)
 
-    triggerCollection.after.insert(function(userId, doc) {
-      debug(`triggerCollection ${triggerCollection._name}.after.insert`)
+    relatedCollection.after.insert(function(userId, doc) {
+      debug(`relatedCollection ${relatedCollection._name}.after.insert`)
       // doc._id = doc._id.insertedIds[0]  // fix for insert-hook
       const ids = DenormalizedViews._validateAndCallRefreshIds({ doc, refreshIds, userId })
       if (ids && ids.length>0) {
@@ -136,8 +139,8 @@ export const DenormalizedViews = class DenormalizedViews {
       }
     })
 
-    triggerCollection.after.update(function(userId, doc, fieldNames, modifier) {
-      debug(`triggerCollection ${triggerCollection._name}.after.update`)
+    relatedCollection.after.update(function(userId, doc, fieldNames, modifier) {
+      debug(`relatedCollection ${relatedCollection._name}.after.update`)
       const ids = DenormalizedViews._validateAndCallRefreshIds({ doc, refreshIds, userId })
       if (ids && ids.length>0) {
         DenormalizedViews._updateIds({
@@ -152,8 +155,8 @@ export const DenormalizedViews = class DenormalizedViews {
     // his name or gets deleted than the "view"-collection needs to refresh.
     // Of course in this case the App itself would have to make sure that
     // before authorId is removed from sourceCollection
-    triggerCollection.after.remove(function(userId, doc) {
-      debug(`triggerCollection ${triggerCollection._name}.after.remove`, doc)
+    relatedCollection.after.remove(function(userId, doc) {
+      debug(`relatedCollection ${relatedCollection._name}.after.remove`)
       const ids = DenormalizedViews._validateAndCallRefreshIds({ doc, refreshIds, userId })
       if (ids && ids.length>0) {
         DenormalizedViews._updateIds({
@@ -180,6 +183,7 @@ export const DenormalizedViews = class DenormalizedViews {
     }).validate(options)
 
     const { identifier, refreshIds } = options
+    debug(`refreshManually for identifier ${identifier} and ids:`, refreshIds)
 
     if (refreshIds && refreshIds.length>0) {
       DenormalizedViews._updateIds({
@@ -205,7 +209,7 @@ export const DenormalizedViews = class DenormalizedViews {
     debug(`refreshAll for collection "${existingSyncronisation.sourceCollection._name}"`)
 
     DenormalizedViews._executeDatabaseComand(() => {
-      existingSyncronisation.targetCollection.remove({})
+      existingSyncronisation.viewCollection.remove({})
     })
 
     let ids = existingSyncronisation.sourceCollection.find({}, { fields: { '_id': 1 } }).fetch()
@@ -218,10 +222,10 @@ export const DenormalizedViews = class DenormalizedViews {
         syncronisation: existingSyncronisation,
       })
       DenormalizedViews._executeDatabaseComand(() => {
-        existingSyncronisation.targetCollection.insert(doc)
+        existingSyncronisation.viewCollection.insert(doc)
       })
     }
-    debug(`${ids.length} docs in cache ${existingSyncronisation.targetCollection._name} were refreshed`)
+    debug(`${ids.length} docs in cache ${existingSyncronisation.viewCollection._name} were refreshed`)
   }
 
   /**
@@ -240,7 +244,7 @@ export const DenormalizedViews = class DenormalizedViews {
     }).validate(options)
 
     const { syncronisation, userId } = options
-    const { sourceCollection, targetCollection, sync, postSync, pick } = syncronisation
+    const { sourceCollection, viewCollection, sync, postSync, pick } = syncronisation
     let doc = options.doc
 
     // Loop each property set in "sync"
@@ -262,7 +266,7 @@ export const DenormalizedViews = class DenormalizedViews {
         // we are using a $set operation which will ADD,
         // but NOT remove a property. So in this special case
         // we need to do an extra write to the db and unset
-        DenormalizedViews._unsetProperty({ property, _id: doc._id, collection: targetCollection })
+        DenormalizedViews._unsetProperty({ property, _id: doc._id, collection: viewCollection })
       }
     }
 
@@ -286,7 +290,7 @@ export const DenormalizedViews = class DenormalizedViews {
           // we are using a $set operation which will ADD,
           // but NOT remove a property. So in this special case
           // we need to do an extra write to the db and unset
-          DenormalizedViews._unsetProperty({ property, _id: doc._id, collection: targetCollection })
+          DenormalizedViews._unsetProperty({ property, _id: doc._id, collection: viewCollection })
         }
       }
     }
@@ -322,6 +326,7 @@ export const DenormalizedViews = class DenormalizedViews {
     const { identifier, idsToRefresh, userId } = options
 
     const existingSyncronisation = DenormalizedViews._getExistingSyncronisation({ identifier })
+    debug(`refreshing ids in "view"-collection "${existingSyncronisation.viewCollection._name}":`, idsToRefresh)
 
     for (const id of idsToRefresh) {
       let doc = existingSyncronisation.sourceCollection.findOne(id)
@@ -332,7 +337,7 @@ export const DenormalizedViews = class DenormalizedViews {
       })
 
       DenormalizedViews._executeDatabaseComand(() => {
-        existingSyncronisation.targetCollection.update(doc._id, { $set: doc })
+        existingSyncronisation.viewCollection.update(doc._id, { $set: doc })
       })
     }
   }

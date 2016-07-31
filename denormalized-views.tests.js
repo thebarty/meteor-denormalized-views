@@ -63,7 +63,7 @@ const DENORMALIZED_POST_COLLECTION = 'DENORMALIZED_POST_COLLECTION'
 DenormalizedViews.addSyncronisation({
   identifier: DENORMALIZED_POST_COLLECTION,
   sourceCollection: Posts,
-  targetCollection: PostsDenormalizedView,
+  viewCollection: PostsDenormalizedView,
   sync: {
     commentsCache: (post, userId) => {
       const comments = []
@@ -96,7 +96,7 @@ DenormalizedViews.addSyncronisation({
 
 DenormalizedViews.refreshByCollection({
   identifier: DENORMALIZED_POST_COLLECTION,
-  triggerCollection: Authors,
+  relatedCollection: Authors,
   refreshIds: (author, userId) => {
     expect(author).to.be.defined
     // return _id-array of posts that should be updated
@@ -108,7 +108,7 @@ DenormalizedViews.refreshByCollection({
 
 DenormalizedViews.refreshByCollection({
   identifier: DENORMALIZED_POST_COLLECTION,
-  triggerCollection: Categories,
+  relatedCollection: Categories,
   refreshIds: (category, userId) => {
     expect(category).to.be.defined
     // return _id-array of posts that should be updated
@@ -238,7 +238,7 @@ if (Meteor.isServer) {
         DenormalizedViews.addSyncronisation({
           identifier: DENORMALIZED_POST_COLLECTION,  // duplicate id
           sourceCollection: Posts,
-          targetCollection: PostsDenormalizedView,
+          viewCollection: PostsDenormalizedView,
           sync: { },
         })
       }).to.throw(ERROR_IDENTIFIERT_EXISTS)
@@ -247,7 +247,7 @@ if (Meteor.isServer) {
         DenormalizedViews.addSyncronisation({
           identifier: 'unique',
           sourceCollection: Posts,  // same collection
-          targetCollection: Posts,  // same collection
+          viewCollection: Posts,  // same collection
           sync: { },
         })
       }).to.throw(ERROR_SOURCE_AND_TARGET_COLLECTIONS_NEED_TO_BE_DIFFERENT)
@@ -256,7 +256,7 @@ if (Meteor.isServer) {
         DenormalizedViews.addSyncronisation({
           identifier: 'unique',
           sourceCollection: Posts,
-          targetCollection: PostsDenormalizedView,
+          viewCollection: PostsDenormalizedView,
           sync: {
             // NO content
           },
@@ -267,7 +267,7 @@ if (Meteor.isServer) {
         DenormalizedViews.addSyncronisation({
           identifier: 'unique but combination already exists',
           sourceCollection: Posts,
-          targetCollection: PostsDenormalizedView,
+          viewCollection: PostsDenormalizedView,
           sync: {
             authorCache: (post) => {
               return Authors.findOne(post.authorId)
@@ -277,7 +277,7 @@ if (Meteor.isServer) {
       }).to.throw(ERROR_SYNC_ALREADY_EXISTS_FOR_SOURCE_TARGET_COLLECTIONS)
     })
 
-    it('.addSyncronisation works as expected on INSERTS on targetCollection', function () {
+    it('.addSyncronisation works as expected on INSERTS on viewCollection', function () {
       const fixtures = setupFixtures()  // inserts happen here
       validateFixtures()
 
@@ -290,7 +290,7 @@ if (Meteor.isServer) {
       expect(postDenormalized1.wholeText).to.equal('post 1, comment 1, author 1')
       expect(postDenormalized1.numberOfComments).to.equal(1)
     })
-    it('.addSyncronisation works as expected on UPDATES on targetCollection', function () {
+    it('.addSyncronisation works as expected on UPDATES on viewCollection', function () {
       const fixtures = setupFixtures()
       validateFixtures()
 
@@ -306,7 +306,7 @@ if (Meteor.isServer) {
       expect(postDenormalized1.wholeText).to.equal('post 1 newtext, comment 2, comment 3, author 2')
       expect(postDenormalized1.numberOfComments).to.equal(2)
     })
-    it('.addSyncronisation works as expected on REMOVES on targetCollection', function () {
+    it('.addSyncronisation works as expected on REMOVES on viewCollection', function () {
       const fixtures = setupFixtures()
       validateFixtures()
 
@@ -320,20 +320,20 @@ if (Meteor.isServer) {
       expect(() => {
         DenormalizedViews.refreshByCollection({
           identifier: 'unique does NOT exist yet',
-          triggerCollection: Authors,  // wrong collection!!
+          relatedCollection: Authors,  // wrong collection!!
           refreshIds: () => {},
         })
       }).to.throw(ERROR_REFRESH_BY_COLLECTION_NEEDS_TO_BE_ASSIGNED_TO_AN_EXISTING_ID)
       expect(() => {
         DenormalizedViews.refreshByCollection({
           identifier: DENORMALIZED_POST_COLLECTION,
-          triggerCollection: Posts,  // wrong collection!!
+          relatedCollection: Posts,  // wrong collection!!
           refreshIds: () => {},
         })
       }).to.throw(ERROR_REFRESH_BY_COLLECTION_CAN_NOT_BE_SET_TO_SOURCE_COLLECTION)
     })
 
-    it('.refreshByCollection works as expected on updates on triggerCollection', function () {
+    it('.refreshByCollection works as expected on updates on relatedCollection', function () {
       // NOTE: refreshByCollection() is set up above on Authors collection
       // a simple update on author should refresh the "view"-Collection
       const fixtures = setupFixtures()
@@ -346,7 +346,7 @@ if (Meteor.isServer) {
       expect(postDenormalized1.wholeText).to.equal('post 1, comment 1, author 1 name NEW')
     })
 
-    it('.refreshByCollection works as expected on removes on triggerCollection', function () {
+    it('.refreshByCollection works as expected on removes on relatedCollection', function () {
       const fixtures = setupFixtures()
       validateFixtures()
 
@@ -357,14 +357,14 @@ if (Meteor.isServer) {
       expect(postDenormalized1.wholeText).to.equal('post 1, comment 1, ')
     })
 
-    it('.refreshByCollection works as expected on inserts on triggerCollection', function () {
+    it('.refreshByCollection works as expected on inserts on relatedCollection', function () {
       const fixtures = setupFixtures()
       validateFixtures()
 
       // this is a weird useCase for an insert-trigger, because oin order
       // to keep data consistentand enable Posts "view-collection"
       // to load the correct data, we need to set Posts.categoryId anyway.
-      // So this test does NOT really make sense as it does NOT test, how triggerCollection()
+      // So this test does NOT really make sense as it does NOT test, how relatedCollection()
       // works on insert, except that it makes sure that NO errors are thrown.
       const categoryId1 = Categories.insert({ text: 'category 1', postId: fixtures.postId1 })
       const postDenormalized1 = PostsDenormalizedView.findOne(fixtures.postId1)
