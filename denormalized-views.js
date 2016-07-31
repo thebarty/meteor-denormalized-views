@@ -241,17 +241,18 @@ export const DenormalizedViews = class DenormalizedViews {
    * @return {Object} doc that contains the collected data
    */
   static _processDoc(options = {}) {
-    new SimpleSchema({
-      // mandatory
-      doc: { type: Object, blackbox: true },
-      syncronisation: { type: Object, blackbox: true },
-      // optional
-      userId: { type: String, optional: true },
-    }).validate(options)
-
     const { syncronisation, userId } = options
     const { viewCollection, sync, postSync, pick } = syncronisation
     let doc = options.doc
+    // validate options
+    // we cannot use SimpleSchema-validation here,
+    // because we want to support use of superclasses
+    // for docs in collection.
+    if(!_.isObject(doc)) {
+      throw new Error('options.doc needs to be an Object')
+    }
+    check(syncronisation, Object)
+    check(userId, Match.Maybe(String))
 
     // Loop each property set in "sync"
     // and assign its return-value to the doc
@@ -429,14 +430,24 @@ export const DenormalizedViews = class DenormalizedViews {
    * @return {[type]}          [description]
    */
   static _executeDatabaseComand(aFunction) {
-    if (DenormalizedViews.DeferWriteAccess) {
-      // good for mass-data
-      Meteor.defer(() => {
+    // we run database-updates ONLY on the server,
+    // in order to relax the client, BUT need collections
+    // to be known on the client,
+    // p.e. for aldeed:tabular-support, so this is the
+    // place to make sure, that we are on server.
+    // In future we might add a "publishToClient" setting,
+    // so that we can utilizy latency compensation.
+    // For now this will do it.
+    if (Meteor.isServer) {
+      if (DenormalizedViews.DeferWriteAccess) {
+        // good for mass-data
+        Meteor.defer(() => {
+          aFunction.call()
+        })
+      } else {
+        // high speed
         aFunction.call()
-      })
-    } else {
-      // high speed
-      aFunction.call()
+      }
     }
   }
 }

@@ -25,12 +25,13 @@ Additionally you can hookup "related"-collections to automatically refresh the "
   - [Create "joined search fields" via ``postSync:``](#create-joined-search-fields-via-postsync)
   - [Pick the fields you need via ``pick()``](#pick-the-fields-you-need-via-pick)
 - [Staying in sync](#staying-in-sync)
-  - [**Automatically** synchronize "related"-collections (``refreshByCollection()``)](#automatically-synchronize-related-collections-refreshbycollection)
-  - [**Manually** refreshing **individual** docs (``refreshManually()``)](#manually-refreshing-individual-docs-refreshmanually)
-  - [**Manually** refreshing the **whole** collection (``refreshAll()``)](#manually-refreshing-the-whole-collection-refreshall)
+  - [*Automatically* synchronize "related"-collections (``refreshByCollection()``)](#automatically-synchronize-related-collections-refreshbycollection)
+  - [*Manually* refresh individual docs (``refreshManually()``)](#manually-refresh-individual-docs-refreshmanually)
+  - [*Manually* refreshing the whole collection (``refreshAll()``)](#manually-refreshing-the-whole-collection-refreshall)
 - [Debug mode ``DenormalizedViews.Debug = true``](#debug-mode-denormalizedviewsdebug--true)
 - [Defer syncing via ``DenormalizedViews.DeferWriteAccess``](#defer-syncing-via-denormalizedviewsdeferwriteaccess)
 - [A full example containing all options](#a-full-example-containing-all-options)
+- [Latency compensation?](#latency-compensation)
 - [Open Todos](#open-todos)
 - [How to contribute to this package](#how-to-contribute-to-this-package)
 - [Research Resources](#research-resources)
@@ -67,8 +68,6 @@ You know that ``aldeed:tabular`` is a great package to list a collection in the 
 
 
 # Setup by ``addView()``
-
-**NOTE: The package API needs to be run on the server!** *The client will then receive new data via pub/sub*
 
 Use ``addView()`` to define how your "view"-collection collects its data. It all starts at the "source"-collection (p.e. Posts): **data of the "source"-collection will automatically be copied 1-to-1 to the "view"-collection** (= the "view"-collection). Scroll down to see the first code.
 
@@ -175,7 +174,7 @@ There are **2 options to keep the "view"-collection in sync with "related"-colle
 
 Start with option 1) and use option 2) if needed at all.
 
-## **Automatically** synchronize "related"-collections (``refreshByCollection()``)
+## *Automatically* synchronize "related"-collections (``refreshByCollection()``)
 
 Setup a ``refreshByCollection()`` to automatically synchronize changes made to a "related"-collection. Your task in here is to tell the "view"-collection which _ids shall be refreshed:
 
@@ -200,7 +199,7 @@ DenormalizedViews.refreshByCollection({
 ```
 
 
-## **Manually** refreshing **individual** docs (``refreshManually()``)
+## *Manually* refresh individual docs (``refreshManually()``)
 
 There might be places where you want to manually refresh the "view"-collection, p.e. in a ``Meteor.method``. You can use ``refreshManually()`` to do so:
 
@@ -214,7 +213,7 @@ DenormalizedViews.refreshManually({
 ```
 
 
-## **Manually** refreshing the **whole** collection (``refreshAll()``)
+## *Manually* refreshing the whole collection (``refreshAll()``)
 
 If you ever want to manually refresh the whole view collection, you can use ``refreshAll()``. 
 
@@ -290,6 +289,12 @@ DenormalizedViews.addView({
 })
 ```
 
+# Latency compensation?
+
+Note that we run database-queries ONLY on the server, meaning that the client will receive new data via pub/sub on the "view"-collection. Tools like "aldeed:tabular" have build-in mechanisms to relax the client and only publish the docs currently needed.
+
+*In future versions we might add a "publishToClient"-option within ``addView`` to configure on a per-table-basis auto-publish. Let us know if you need it.*
+
 
 # Open Todos
 
@@ -309,3 +314,5 @@ Lets make this perfect and collaborate. This is how to set up your local testing
 # Research Resources
 
  * [1] https://themeteorchef.com/snippets/using-unblock-and-defer-in-methods/#tmc-when-to-use-unblock-vs-defer When to use Meteor.defer(). Inspiration our ``DenormalizedViews.DeferWriteAccess``-setting.
+ * [2] http://martinfowler.com/bliki/CQRS.html
+ * [3] http://martinfowler.com/bliki/ReportingDatabase.html
