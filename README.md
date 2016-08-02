@@ -88,22 +88,26 @@ Within the ``sync``-property you **extend the target document** and hand each ne
 import { DenormalizedViews } from 'meteor/thebarty:denormalized-views'
 
 const IDENTIFIER = 'identifier' // unique id
-const PostsView = new Mongo.Collection('postsview')  // create collection
+const PostsView = new Mongo.Collection('postsview')  // create "view"-collection
 
 DenormalizedViews.addView({
 	identifier: IDENTIFIER,
 	sourceCollection: Posts,
 	viewCollection: PostsView,
 	sync: {
-		// In here you extend the targetDoc:
+		// In here you extend the doc of the "source"-collection
+		// in order to be put into the "view"-collection.
+		// 
 		// Simply define a property and assign it a function. 
-		// Collection the data within this function
+		// Within the function: Collect the data you need
 		// and return it. If you return "undefined",
 		// the property will removed from the doc.
 		// 
 		// The function will be passed 2 parameters:
 		//  1) the current doc of the "source"-Collection 
 		//  2) the current userId (when available)
+		//  
+		//  Some examples:
 		authorCache: (post, userId) => {
 			return Authors.findOne(post.authorId)
 		},
