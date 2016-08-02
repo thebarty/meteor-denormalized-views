@@ -45,20 +45,20 @@ export const DenormalizedViews = class DenormalizedViews {
     // Validate options
     // validate that identifier is NOT yet registered
     if (_.contains(_.pluck(SyncronisationStore, 'identifier'), identifier)) {
-      throw new Error(`${ERROR_IDENTIFIERT_EXISTS}: ${identifier}`)
+      throw new Meteor.Error(`${ERROR_IDENTIFIERT_EXISTS}: ${identifier}`)
     }
     // validate that collections are NOT the same
     if (sourceCollection===viewCollection) {
-      throw new Error(ERROR_SOURCE_AND_TARGET_COLLECTIONS_NEED_TO_BE_DIFFERENT)
+      throw new Meteor.Error(ERROR_SOURCE_AND_TARGET_COLLECTIONS_NEED_TO_BE_DIFFERENT)
     }
     if (_.isEmpty(sync)) {
-      throw new Error(ERROR_SYNC_NEEDS_TO_HAVE_CONTENT)
+      throw new Meteor.Error(ERROR_SYNC_NEEDS_TO_HAVE_CONTENT)
     }
     if (_.find(SyncronisationStore, (store) => {
             return (store.sourceCollection===sourceCollection
               && store.viewCollection===viewCollection)
        })) {
-      throw new Error(ERROR_SYNC_ALREADY_EXISTS_FOR_SOURCE_TARGET_COLLECTIONS)
+      throw new Meteor.Error(ERROR_SYNC_ALREADY_EXISTS_FOR_SOURCE_TARGET_COLLECTIONS)
     }
     // is valid? Register it
     debug(`addView from sourceCollection "${sourceCollection._name}" to "${viewCollection._name}"`)
@@ -117,12 +117,12 @@ export const DenormalizedViews = class DenormalizedViews {
     const existingSyncronisation = DenormalizedViews._getExistingSyncronisation({ identifier })
     // validate that we have a valid identifier
     if (!existingSyncronisation) {
-      throw new Error(ERROR_REFRESH_BY_COLLECTION_NEEDS_TO_BE_ASSIGNED_TO_AN_EXISTING_ID)
+      throw new Meteor.Error(ERROR_REFRESH_BY_COLLECTION_NEEDS_TO_BE_ASSIGNED_TO_AN_EXISTING_ID)
     }
     // validate that we have a valid collection assigned
     if (existingSyncronisation.sourceCollection===relatedCollection
       || existingSyncronisation.viewCollection===relatedCollection) {
-      throw new Error(ERROR_REFRESH_BY_COLLECTION_CAN_NOT_BE_SET_TO_SOURCE_COLLECTION)
+      throw new Meteor.Error(ERROR_REFRESH_BY_COLLECTION_CAN_NOT_BE_SET_TO_SOURCE_COLLECTION)
     }
 
     debug(`setup refreshByCollection for identifier "${identifier}" and relatedCollection "${relatedCollection._name}"`)
@@ -143,7 +143,12 @@ export const DenormalizedViews = class DenormalizedViews {
 
     relatedCollection.after.update(function(userId, doc, fieldNames, modifier) {
       debug(`relatedCollection ${relatedCollection._name}.after.update`)
-      const ids = DenormalizedViews._validateAndCallRefreshIds({ doc, refreshIds, userId })
+      const ids = DenormalizedViews._validateAndCallRefreshIds({
+        doc,
+        refreshIds,
+        userId,
+        docPrevious: this.previous,  // the caller is gonna need that to find the correct ids
+      })
       if (ids && ids.length>0) {
         DenormalizedViews._updateIds({
           identifier,
@@ -235,7 +240,8 @@ export const DenormalizedViews = class DenormalizedViews {
   }
 
   /**
-   * Process a given doc by "sync"- and "postSync" options
+   * Process a given doc by a given syncronisation-setting
+   * and add "sync"- and "postSync" options.
    *
    * @param  {Object} options [description]
    * @return {Object} doc that contains the collected data
@@ -249,7 +255,7 @@ export const DenormalizedViews = class DenormalizedViews {
     // because we want to support use of superclasses
     // for docs in collection.
     if(!_.isObject(doc)) {
-      throw new Error('options.doc needs to be an Object')
+      throw new Meteor.Error('options.doc needs to be an Object')
     }
     check(syncronisation, Object)
     check(userId, Match.Maybe(String))
@@ -259,14 +265,14 @@ export const DenormalizedViews = class DenormalizedViews {
     for (const property of Object.getOwnPropertyNames(sync)) {
       const propertyFunction = sync[property]
       if (!_.isFunction(propertyFunction)) {
-        throw new Error(`sync.${property} needs to be a function`)
+        throw new Meteor.Error(`sync.${property} needs to be a function`)
       }
 
       // call the function
       // and assign its result to the object
       const result = propertyFunction.call(this, doc, userId)
-      // if there is a result: assign it to doc
-      if (result) {
+      // if there is a valid result: assign it to doc
+      if (result || result===[] || result===0) {
         doc[property] = result
       } else {
         delete doc[property]
@@ -283,14 +289,14 @@ export const DenormalizedViews = class DenormalizedViews {
       for (const property of Object.getOwnPropertyNames(postSync)) {
         const propertyFunction = postSync[property]
         if (!_.isFunction(propertyFunction)) {
-          throw new Error(`postSync.${property} needs to be a function`)
+          throw new Meteor.Error(`postSync.${property} needs to be a function`)
         }
 
         // call the function
         // and assign its result to the object
         const result = propertyFunction.call(this, doc, userId)
-        // if there is a result: assign it to doc
-        if (result) {
+        // if there is a valid result: assign it to doc
+        if (result || result===[] || result===0) {
           doc[property] = result
         } else {
           delete doc[property]
@@ -337,6 +343,11 @@ export const DenormalizedViews = class DenormalizedViews {
 
     for (const id of idsToRefresh) {
       let doc = existingSyncronisation.sourceCollection.findOne(id)
+      if (!doc) {
+        debug(`existing docs in ${existingSyncronisation.sourceCollection._name}`, existingSyncronisation.sourceCollection.find().fetch())
+
+        throw new Meteor.Error(`trying to refresh "${id}", but it does NOT exist in collection "${existingSyncronisation.sourceCollection._name}". Are you sure that you passed the correct _ids?`)
+      }
       doc = DenormalizedViews._processDoc({
         doc,
         userId,
@@ -378,21 +389,22 @@ export const DenormalizedViews = class DenormalizedViews {
   static _validateAndCallRefreshIds(options = {}) {
     new SimpleSchema({
       doc: { type: Object, blackbox: true },
+      docPrevious: { type: Object, blackbox: true, optional: true },  // only on updates!
       refreshIds: { type: Function },
       userId: { type: String, optional: true },
     }).validate(options)
 
-    const { doc, userId, refreshIds } = options
+    const { doc, docPrevious, userId, refreshIds } = options
 
     // validate that we have a function
     if (!_.isFunction(refreshIds)) {
-      throw new Error('refreshByCollection.refreshIds needs to be a function')
+      throw new Meteor.Error('refreshByCollection.refreshIds needs to be a function')
     }
     // validate that the refreshIds-function returns either
     // undefined, [String] or []
-    const ids = refreshIds.call(this, doc, userId)
-    if (! (Match.test(ids, [String]) || !_.isUndefined() || ids===[] )) {
-      throw new Error(`refreshByCollection.refreshIds needs to return an array of strings, an empty array or undefined, BUT it returned "${ids}"`)
+    const ids = refreshIds.call(this, doc, docPrevious, userId)
+    if (! (Match.test(ids, [String]) || _.isUndefined(ids) || ids===[] )) {
+      throw new Meteor.Error(`refreshByCollection.refreshIds needs to return an array of strings, an empty array or undefined, BUT it returned "${ids}"`)
     }
 
     return ids

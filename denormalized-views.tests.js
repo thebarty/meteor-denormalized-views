@@ -19,6 +19,7 @@ const Categories = new Mongo.Collection('categories')
 const Comments = new Mongo.Collection('comments')
 const Posts = new Mongo.Collection('posts')
 const PostsDenormalizedView = new Mongo.Collection('postsdenormalizedview')
+const Tags = new Mongo.Collection('tags')
 const HookTestCollection = new Mongo.Collection('hooktestcollection')  // needed for testcase
 Authors.attachSchema(new SimpleSchema({
   name: {
@@ -36,6 +37,14 @@ Categories.attachSchema(new SimpleSchema({
   },
   postId: {
     type: String,
+  },
+}))
+Tags.attachSchema(new SimpleSchema({
+  text: {
+    type: String,
+  },
+  postIds: {
+    type: [String],
   },
 }))
 Posts.attachSchema(new SimpleSchema({
@@ -79,6 +88,9 @@ DenormalizedViews.addView({
     categoryCache: (post, userId) => {
       return Categories.findOne(post.categoryId)
     },
+    tagsCache: (post, userId) => {
+      return Tags.find({ postIds: post._id }).fetch()
+    },
   },
   postSync: {
     wholeText: (post, userId) => {
@@ -97,7 +109,7 @@ DenormalizedViews.addView({
 DenormalizedViews.refreshByCollection({
   identifier: DENORMALIZED_POST_COLLECTION,
   relatedCollection: Authors,
-  refreshIds: (author, userId) => {
+  refreshIds: (author, authorPrevious, userId) => {
     expect(author).to.be.defined
     // return _id-array of posts that should be updated
     // return false, an empty array or undefined to NOT sync
@@ -109,20 +121,40 @@ DenormalizedViews.refreshByCollection({
 DenormalizedViews.refreshByCollection({
   identifier: DENORMALIZED_POST_COLLECTION,
   relatedCollection: Categories,
-  refreshIds: (category, userId) => {
-    expect(category).to.be.defined
+  refreshIds: (doc, docPrevious, userId) => {
+    expect(doc).to.be.defined
     // return _id-array of posts that should be updated
     // return false, an empty array or undefined to NOT sync
-    const posts = Posts.find({ _id: category.postId }).fetch()
-    return _.pluck(posts, '_id')
+    if (docPrevious) {
+      // update
+      return _.union(doc.postIds, docPrevious.postIds)
+    } else {
+      // insert | remove
+      return doc.postIds
+    }
+  },
+})
+
+DenormalizedViews.refreshByCollection({
+  identifier: DENORMALIZED_POST_COLLECTION,
+  relatedCollection: Tags,
+  refreshIds: (doc, docPrevious, userId) => {
+    if (docPrevious) {
+      // update
+      return _.union(doc.postIds, docPrevious.postIds)
+    } else {
+      // insert | remove
+      return doc.postIds
+    }
   },
 })
 
 const setupFixtures = () => {
-  Authors.remove({})
-  Comments.remove({})
-  Posts.remove({})
-  PostsDenormalizedView.remove({})
+  Authors.direct.remove({})
+  Comments.direct.remove({})
+  Posts.direct.remove({})
+  PostsDenormalizedView.direct.remove({})
+  Tags.direct.remove({})
 
   const authorId1 = Authors.insert({
     name: 'author 1',
@@ -176,6 +208,13 @@ const setupFixtures = () => {
       commentId4,
     ],
   })
+  const tagId1 = Tags.insert({
+    text: 'tag 1',
+    postIds: [
+      postId1,
+      postId2,
+    ],
+  })
 
   return {
     commentId1,
@@ -189,14 +228,53 @@ const setupFixtures = () => {
     postId2,
     postId3,
     postId4,
+    tagId1,
   }
 }
 
-const validateFixtures = () => {
+const validateFixtures = (fixtures) => {
   expect(Authors.find().count()).to.equal(3)
   expect(Comments.find().count()).to.equal(4)
   expect(Posts.find().count()).to.equal(4)
   expect(PostsDenormalizedView.find().count()).to.equal(4)
+  expect(Tags.find().count()).to.equal(1)
+  const postDenormalized1 = PostsDenormalizedView.findOne(fixtures.postId1)
+  const postDenormalized2 = PostsDenormalizedView.findOne(fixtures.postId2)
+  const postDenormalized3 = PostsDenormalizedView.findOne(fixtures.postId3)
+  const postDenormalized4 = PostsDenormalizedView.findOne(fixtures.postId4)
+
+  expect(postDenormalized1._id).to.equal(fixtures.postId1)
+  expect(postDenormalized1.text).to.equal('post 1')
+  expect(postDenormalized1.commentsCache.length).to.equal(1)
+  expect(postDenormalized1.commentsCache[0].text).to.equal('comment 1')
+  expect(postDenormalized1.authorCache.name).to.equal('author 1')
+  expect(postDenormalized1.tagsCache[0].text).to.equal('tag 1')
+  expect(postDenormalized1.wholeText).to.equal('post 1, comment 1, author 1')
+  expect(postDenormalized1.numberOfComments).to.equal(1)
+
+  expect(postDenormalized2._id).to.equal(fixtures.postId2)
+  expect(postDenormalized2.text).to.equal('post 2')
+  expect(postDenormalized2.commentsCache.length).to.equal(1)
+  expect(postDenormalized2.commentsCache[0].text).to.equal('comment 2')
+  expect(postDenormalized2.authorCache.name).to.equal('author 1')
+  expect(postDenormalized2.tagsCache[0].text).to.equal('tag 1')
+  expect(postDenormalized2.wholeText).to.equal('post 2, comment 2, author 1')
+  expect(postDenormalized2.numberOfComments).to.equal(1)
+
+  expect(postDenormalized3._id).to.equal(fixtures.postId3)
+  expect(postDenormalized3.text).to.equal('post 3')
+  expect(postDenormalized3.commentsCache.length).to.equal(0)
+  expect(postDenormalized3.authorCache.name).to.equal('author 2')
+  expect(postDenormalized3.wholeText).to.equal('post 3, , author 2')
+  expect(postDenormalized3.numberOfComments).to.equal(0)
+
+  expect(postDenormalized4._id).to.equal(fixtures.postId4)
+  expect(postDenormalized4.text).to.equal('post 4')
+  expect(postDenormalized4.commentsCache.length).to.equal(1)
+  expect(postDenormalized4.commentsCache[0].text).to.equal('comment 4')
+  expect(postDenormalized4.authorCache.name).to.equal('author 2')
+  expect(postDenormalized4.wholeText).to.equal('post 4, comment 4, author 2')
+  expect(postDenormalized4.numberOfComments).to.equal(1)
 }
 
 // TESTS
@@ -279,20 +357,11 @@ if (Meteor.isServer) {
 
     it('.addView works as expected on INSERTS on viewCollection', function () {
       const fixtures = setupFixtures()  // inserts happen here
-      validateFixtures()
-
-      const postDenormalized1 = PostsDenormalizedView.findOne(fixtures.postId1)
-      expect(postDenormalized1._id).to.equal(fixtures.postId1)
-      expect(postDenormalized1.text).to.equal('post 1')
-      expect(postDenormalized1.commentsCache.length).to.equal(1)
-      expect(postDenormalized1.commentsCache[0].text).to.equal('comment 1')
-      expect(postDenormalized1.authorCache.name).to.equal('author 1')
-      expect(postDenormalized1.wholeText).to.equal('post 1, comment 1, author 1')
-      expect(postDenormalized1.numberOfComments).to.equal(1)
+      validateFixtures(fixtures)  // inserts are validated in here
     })
     it('.addView works as expected on UPDATES on viewCollection', function () {
       const fixtures = setupFixtures()
-      validateFixtures()
+      validateFixtures(fixtures)
 
       const updates = Posts.update(fixtures.postId1, { $set: { text: 'post 1 newtext', commentIds: [fixtures.commentId2, fixtures.commentId3], authorId: fixtures.authorId2 } })
       expect(updates).to.equal(1)
@@ -308,7 +377,7 @@ if (Meteor.isServer) {
     })
     it('.addView works as expected on REMOVES on viewCollection', function () {
       const fixtures = setupFixtures()
-      validateFixtures()
+      validateFixtures(fixtures)
 
       const updates = Posts.remove(fixtures.postId1)
       expect(updates).to.equal(1)
@@ -337,18 +406,30 @@ if (Meteor.isServer) {
       // NOTE: refreshByCollection() is set up above on Authors collection
       // a simple update on author should refresh the "view"-Collection
       const fixtures = setupFixtures()
-      validateFixtures()
+      validateFixtures(fixtures)
 
-      // UPDATE
+      // UPDATE (has one relationship)
       Authors.update(fixtures.authorId1, { $set: { name: 'author 1 name NEW' } })
       const postDenormalized1 = PostsDenormalizedView.findOne(fixtures.postId1)
       expect(postDenormalized1.authorCache.name).to.equal('author 1 name NEW')
       expect(postDenormalized1.wholeText).to.equal('post 1, comment 1, author 1 name NEW')
+
+      // UPDATE (has multiple relationship)
+      Tags.update(fixtures.tagId1, { $set: {
+        postIds: [
+          fixtures.postId1,
+        ],
+      } })
+      const postDenormalized1_1 = PostsDenormalizedView.findOne(fixtures.postId1)
+      const postDenormalized2_1 = PostsDenormalizedView.findOne(fixtures.postId2)
+      expect(postDenormalized1_1.tagsCache.length).to.equal(1)
+      expect(postDenormalized1_1.tagsCache[0].text).to.equal('tag 1')
+      expect(postDenormalized2_1.tagsCache.length).to.equal(0)
     })
 
     it('.refreshByCollection works as expected on removes on relatedCollection', function () {
       const fixtures = setupFixtures()
-      validateFixtures()
+      validateFixtures(fixtures)
 
       // REMOVE
       Authors.remove(fixtures.authorId1)
@@ -359,7 +440,7 @@ if (Meteor.isServer) {
 
     it('.refreshByCollection works as expected on inserts on relatedCollection', function () {
       const fixtures = setupFixtures()
-      validateFixtures()
+      validateFixtures(fixtures)
 
       // this is a weird useCase for an insert-trigger, because oin order
       // to keep data consistentand enable Posts "view-collection"
@@ -376,7 +457,7 @@ if (Meteor.isServer) {
 
     it('.refreshManually works as expected', function () {
       const fixtures = setupFixtures()
-      validateFixtures()
+      validateFixtures(fixtures)
 
       // NOTE: in our test-setting Comments are NOT automatically synced
       // to "view"-collection via ``refreshByCollection``,
@@ -397,7 +478,7 @@ if (Meteor.isServer) {
 
     it('.refreshAll works as expected', function () {
       const fixtures = setupFixtures()
-      validateFixtures()
+      validateFixtures(fixtures)
 
       // NOTE: comments are NOT synced automatically, so in this test
       // we update their text and then check if the "view"-collection

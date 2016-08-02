@@ -98,7 +98,8 @@ DenormalizedViews.addView({
 		// In here you extend the targetDoc:
 		// Simply define a property and assign it a function. 
 		// Collection the data within this function
-		// and return it.
+		// and return it. If you return "undefined",
+		// the property will removed from the doc.
 		// 
 		// The function will be passed 2 parameters:
 		//  1) the current doc of the "source"-Collection 
@@ -176,9 +177,11 @@ Start with option 1) and use option 2) if needed at all.
 
 ## *Automatically* synchronize "related"-collections (``refreshByCollection()``)
 
-Setup a ``refreshByCollection()`` to automatically synchronize changes made to a "related"-collection. Your task in here is to tell the "view"-collection which _ids shall be refreshed:
+Setup a ``refreshByCollection()`` to **automatically synchronize** changes made to a "related"-collection. Your task in here is to tell the "view"-collection which _ids shall be refreshed:
 
 Within the ``refreshIds``-parameter's function **return an array of ``_ids``**. Those _ids will then be refreshed within "view"-collection. The first parameter in this function gives you the current doc change in the "related"-collection. 
+
+Within the ``relatedCollection`` parameter you define a function that returns the instance of the "related"-collection. By doing so we support circular-imports, p.e. where a "Product"-collection refreshes the "Category"-view and a "Category"-collection refreshes the "Product"-view. Read [4] for more infos.
 
 If you return false, undefined or null a refresh will NOT be triggered.
 
@@ -186,9 +189,12 @@ If you return false, undefined or null a refresh will NOT be triggered.
 DenormalizedViews.refreshByCollection({
 	identifier: IDENTIFIER,
 	relatedCollection: Authors,
-	refreshIds: (author, userId) => {
-		// The first parameter is the current doc changed within
-		// the "related"-collection.
+	refreshIds: (author, authorPrevious, userId) => {
+		// The function is passed 3 parameters
+		// 1) The current doc changed within the "related"-collection
+		// 2) The previous doc changed within the "related"-collection
+		//    (this is available on Mongo-"update"-modifiers)
+		// 3) The current userId (if available)
 		// Return an array of _ids that should be updated in "view"-collection.
 		// Returning false, an empty array or undefined, will simply 
 		// not refresh anything.
@@ -196,12 +202,29 @@ DenormalizedViews.refreshByCollection({
 		return _.pluck(posts, '_id')
 	},
 })
+
+// Example2:
+// if you store references within the related collection,
+// be sure to union all affected _ids in doc & docPrevious
+DenormalizedViews.refreshByCollection({
+  	identifier: DENORMALIZED_POST_COLLECTION,
+  	relatedCollection: Categories,
+  	refreshIds: (doc, docPrevious, userId) => {
+  	  	if (docPrevious) {
+  	  	  // update
+  	  	  return _.union(doc.postIds, docPrevious.postIds)
+  	  	} else {
+  	  	  // insert | remove
+  	  	  return doc.postIds
+  	  	}
+  	},
+})
 ```
 
 
 ## *Manually* refresh individual docs (``refreshManually()``)
 
-There might be places where you want to manually refresh the "view"-collection, p.e. in a ``Meteor.method``. You can use ``refreshManually()`` to do so:
+There might be places where you want to **manually refresh** the "view"-collection, p.e. in a ``Meteor.method``. You can use ``refreshManually()`` to do so:
 
 ```js
 // this is the manual way of doing it,
@@ -215,7 +238,7 @@ DenormalizedViews.refreshManually({
 
 ## *Manually* refreshing the whole collection (``refreshAll()``)
 
-If you ever want to manually refresh the whole view collection, you can use ``refreshAll()``. 
+If you ever want to manually **refresh the whole "view"-collection"**, you can use ``refreshAll()``. 
 
 **Note that this is the slowest option, because the whole table will be refreshed.**
 
@@ -246,6 +269,8 @@ DenormalizedViews.DeferWriteAccess = true
 
 
 # A full example containing all options
+
+**For a full example scenario, please have a look at the tests in "denormalized-views.tests.js".**
 
 ```js
 import { DenormalizedViews } from 'meteor/thebarty:denormalized-views'
@@ -299,7 +324,6 @@ Note that we run database-queries ONLY on the server, meaning that the client wi
 # Open Todos
 
  * Receive feedback from the community
- * Does this work 2 way? Having ProductView- and CategoryView both triggering each other? Yes, it should!
 
 
 # How to contribute to this package
