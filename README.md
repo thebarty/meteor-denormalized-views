@@ -3,7 +3,7 @@
 # Denormalized Views for Meteor
 *thebarty:denormalized-views*
 
-A toolkit that helps you to create "read-only" denormalized mongo-"views" (collections), which are especially useful for search-able tables, [reporting databases](http://martinfowler.com/bliki/ReportingDatabase.html) or other read-heavy scenarios (*see "[Example Use-Case](#example-use-case)" for a quick overview*). It's concept also matches with [CQRS](http://martinfowler.com/bliki/CQRS.html).
+A toolkit that helps you to create "read-only" denormalized mongo-"views" (collections), which are especially useful for search-able tables, [reporting databases](http://martinfowler.com/bliki/ReportingDatabase.html) or other read-heavy scenarios (*see "[Example Use-Case](#example-use-case)" for a quick overview*). It's concept also matches with [CQRS's](http://martinfowler.com/bliki/CQRS.html) ["materialized views"](https://msdn.microsoft.com/en-us/library/dn589782.aspx) concept.
 
 The resulting "view"-collection can then be used with tools like ``aldeed:tabular``, or ``easy:search`` to display and search related data.
 
@@ -344,3 +344,4 @@ Lets make this perfect and collaborate. This is how to set up your local testing
  * [1] https://themeteorchef.com/snippets/using-unblock-and-defer-in-methods/#tmc-when-to-use-unblock-vs-defer When to use Meteor.defer(). Inspiration our ``DenormalizedViews.DeferWriteAccess``-setting.
  * [2] http://martinfowler.com/bliki/CQRS.html
  * [3] http://martinfowler.com/bliki/ReportingDatabase.html
+ * [4] https://msdn.microsoft.com/en-us/library/dn589782.aspx Materialized-Views concept
