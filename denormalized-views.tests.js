@@ -1,9 +1,9 @@
 /* eslint-env mocha */
 /* eslint-disable func-names, prefer-arrow-callback */
-
 import { _ } from 'underscore'
 import { chai } from 'meteor/practicalmeteor:chai'
 const expect = chai.expect
+import { spies } from 'meteor/practicalmeteor:sinon'
 
 import { Meteor } from 'meteor/meteor'
 import { Mongo } from 'meteor/mongo'
@@ -12,6 +12,13 @@ import { SimpleSchema } from 'meteor/aldeed:simple-schema'
 import { DenormalizedViews, ERROR_IDENTIFIERT_EXISTS, ERROR_SOURCE_AND_TARGET_COLLECTIONS_NEED_TO_BE_DIFFERENT, ERROR_SYNC_NEEDS_TO_HAVE_CONTENT, ERROR_SYNC_ALREADY_EXISTS_FOR_SOURCE_TARGET_COLLECTIONS, ERROR_REFRESH_BY_COLLECTION_CAN_NOT_BE_SET_TO_SOURCE_COLLECTION, ERROR_REFRESH_BY_COLLECTION_NEEDS_TO_BE_ASSIGNED_TO_AN_EXISTING_ID } from './denormalized-views.js'
 
 DenormalizedViews.Debug = true
+
+// empty class used for spies
+const HookClass = class HookClass {
+  static processHook(doc, userId) {
+    // do something
+  }
+}
 
 // FIXTURES
 const Authors =  new Mongo.Collection('authors')
@@ -79,6 +86,9 @@ DenormalizedViews.addView({
       return true
     }
     return false
+  },
+  postHook(doc, userId) {
+    HookClass.processHook(doc, userId)
   },
   sync: {
     commentsCache: (post, userId) => {
@@ -312,6 +322,12 @@ if (Meteor.isServer) {
       Comments.remove({})
       Posts.remove({})
       PostsDenormalizedView.remove({})
+      // SPIES
+      spies.create('processHook', HookClass, 'processHook')
+    })
+    afterEach(() => {
+      // SPIES
+      spies.restoreAll()
     })
 
     it('.addView does validate options correctly', function () {
@@ -539,6 +555,30 @@ if (Meteor.isServer) {
         text: 'post 6',  // expect PASS
       } })
       expect(PostsDenormalizedView.find().count()).to.equal(5)
+    })
+
+    it('processHook-option works as expected on insert, update and remove', function () {
+      const authorId1 = Authors.insert({
+        name: 'author 1',
+      })
+      const commentId1 = Comments.insert({
+        text: 'comment 1',
+      })
+      const id = Posts.insert({
+        text: 'post 1',
+        additionalText: 'additionalText post 1',
+        authorId: authorId1,
+        commentIds: [
+          commentId1,
+        ],
+      })
+      expect(spies.processHook).to.have.callCount(1)
+      Posts.update(id, { $set: {
+        text: 'post 1 update',
+      } })
+      expect(spies.processHook).to.have.callCount(2)
+      Posts.remove(id)
+      expect(spies.processHook).to.have.callCount(3)
     })
   })
 }

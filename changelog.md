@@ -6,6 +6,7 @@
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
 
+- [0.0.8](#008)
 - [0.0.7](#007)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -13,7 +14,6 @@
 
 # 0.0.8
   * added `filter(doc)`-option (optional) to `DenormalizedViews.addView`, which can be used to only create a doc in the "view"-collection, if it passes a filter (meaning if the function returns `true`).
-
   * added `postHook`-option (optional) to `DenormalizedViews.addView`, which you can pass a function that will be called after a successfull insert-/update-/remove- of the "view"-collection.
 
 

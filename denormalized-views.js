@@ -36,6 +36,7 @@ export const DenormalizedViews = class DenormalizedViews {
       sourceCollection: { type: Mongo.Collection },
       viewCollection: { type: Mongo.Collection },
       filter: { type: Function, blackbox: true, optional: true },
+      postHook: { type: Function, blackbox: true, optional: true },
       pick: { type: [String], optional: true },
       postSync: { type: Object, blackbox: true, optional: true },
       sync: { type: Object, blackbox: true },
@@ -81,6 +82,7 @@ export const DenormalizedViews = class DenormalizedViews {
           debug(`inserting doc with id ${processedDoc._id}`)
           viewCollection.insert(processedDoc)
         })
+        DenormalizedViews._callPostHookIfExists({ doc, userId, postHook: options.postHook })
       } else {
         // filter OUT doc, if it exists
         DenormalizedViews._removeDocFromViewCollectionIfExists({ doc, viewCollection: options.viewCollection })
@@ -104,6 +106,7 @@ export const DenormalizedViews = class DenormalizedViews {
                            //  it did NOT pass the filter. So let's upsert
           })
         })
+        DenormalizedViews._callPostHookIfExists({ doc, userId, postHook: options.postHook })
       } else {
         // filter OUT doc, if it exists
         DenormalizedViews._removeDocFromViewCollectionIfExists({ doc, viewCollection: options.viewCollection })
@@ -116,6 +119,7 @@ export const DenormalizedViews = class DenormalizedViews {
         debug(`removing doc with id ${doc._id}`)
         viewCollection.remove(doc._id)
       })
+      DenormalizedViews._callPostHookIfExists({ doc, userId, postHook: options.postHook })
     })
   }
 
@@ -274,6 +278,16 @@ export const DenormalizedViews = class DenormalizedViews {
       }
     }
     return returnValue
+  }
+
+  /**
+   * Call the `postHook` function, if it exists
+   */
+  static _callPostHookIfExists(options={}) {
+    const { doc, userId, postHook } = options
+    if (!_.isUndefined(postHook) && _.isFunction(postHook)) {
+      postHook.call(this, doc, userId)
+    }
   }
 
   /**

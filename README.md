@@ -24,6 +24,8 @@ Additionally you can hookup "related"-collections to automatically refresh the "
   - [Denormalize via ``sync:``](#denormalize-via-sync)
   - [Create "joined search fields" via ``postSync:``](#create-joined-search-fields-via-postsync)
   - [Pick the fields you need via ``pick()``](#pick-the-fields-you-need-via-pick)
+  - [Filter via ``filter()``](#filter-via-filter)
+  - [Do post-processing via the ``postHook(doc)``-hook](#do-post-processing-via-the-posthookdoc-hook)
 - [Staying in sync](#staying-in-sync)
   - [*Automatically* synchronize "related"-collections (``refreshByCollection()``)](#automatically-synchronize-related-collections-refreshbycollection)
   - [*Manually* refresh individual docs (``refreshManually()``)](#manually-refresh-individual-docs-refreshmanually)
@@ -190,7 +192,7 @@ DenormalizedViews.addView({
 
 ## Do post-processing via the ``postHook(doc)``-hook
 
-If you need to do some processing related to the creation of a "view"-doc, you can use the `postHook`-option. It will be called after a successful insert-/update-/remove- of the "view"-collection has happened and contains the resulting "view"-`doc` as the first parameter.
+If you need to do some processing related to the creation of a "view"-doc, you can use the `postHook`-option. It will be called after a successful insert-/update-/remove- of the "view"-collection has happened and contains the resulting "view"-`doc` as the first- and (if exists) the userId as the second-parameter.
 
 Example:
 ```js
@@ -200,7 +202,7 @@ DenormalizedViews.addView({
   viewCollection: PostsView,
   // ... sync:
   // ... postSync:
-  postHook(doc) {
+  postHook(doc, userId) {
     // do something afterwards
   },
 })
