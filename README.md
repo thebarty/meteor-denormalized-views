@@ -25,7 +25,7 @@ Additionally you can hookup "related"-collections to automatically refresh the "
   - [Create "joined search fields" via ``postSync:``](#create-joined-search-fields-via-postsync)
   - [Pick the fields you need via ``pick()``](#pick-the-fields-you-need-via-pick)
   - [Filter via ``filter()``](#filter-via-filter)
-  - [Do post-processing via the ``postHook(doc)``-hook](#do-post-processing-via-the-posthookdoc-hook)
+  - [Post-processing via the ``postHook(doc)``-hook](#post-processing-via-the-posthookdoc-hook)
 - [Staying in sync](#staying-in-sync)
   - [*Automatically* synchronize "related"-collections (``refreshByCollection()``)](#automatically-synchronize-related-collections-refreshbycollection)
   - [*Manually* refresh individual docs (``refreshManually()``)](#manually-refresh-individual-docs-refreshmanually)
@@ -170,7 +170,7 @@ DenormalizedViews.addView({
 
 ## Filter via ``filter()``
 
-In some useCases you ONLY want to create a doc in the "view"-collection, if it passes a FILTER. Use the `filter()`-option to specify this condition and have it `return true`, if you want the doc to be created. If the function returns anything else than `true`, there will be no further processing and an existing doc (with the same `_id` will be removed).
+In some useCases you ONLY want to create a doc in the "view"-collection, if it passes a FILTER. Use the `filter()`-option to specify this condition and have it `return true`, if you want the doc to be created. If the function returns anything else than ``true``, there will be no further processing and an existing doc (with the same ``_id`` will be removed).
 
 Example:
 ```js
@@ -190,7 +190,7 @@ DenormalizedViews.addView({
 })
 ```
 
-## Do post-processing via the ``postHook(doc)``-hook
+## Post-processing via the ``postHook(doc)``-hook
 
 If you need to do some processing related to the creation of a "view"-doc, you can use the `postHook`-option. It will be called after a successful insert-/update-/remove- of the "view"-collection has happened and contains the resulting "view"-`doc` as the first- and (if exists) the userId as the second-parameter.
 
@@ -329,6 +329,12 @@ DenormalizedViews.addView({
   sourceCollection: Posts,
   viewCollection: PostsView,
   pick: ['text'],  // (optional)
+  filter(post) {
+    if (post.author==='Donald') {
+      return true  // process ONLY posts that where created by "Donald"
+    }
+    return false
+  },
   sync: {
     authorCache: (post, userId) => {
       return Authors.findOne(post.authorId)
@@ -356,6 +362,9 @@ DenormalizedViews.addView({
     numberOfComments: (post, userId) => {
       return post.commentsCache.length
     },
+  },
+  postHook(post, userId) {
+    // do something afterwards
   },
 })
 ```
