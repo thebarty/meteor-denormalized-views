@@ -73,6 +73,13 @@ DenormalizedViews.addView({
   identifier: DENORMALIZED_POST_COLLECTION,
   sourceCollection: Posts,
   viewCollection: PostsDenormalizedView,
+  filter(post) {
+    // let's filter out post 5
+    if (post.text!=='post 5') {
+      return true
+    }
+    return false
+  },
   sync: {
     commentsCache: (post, userId) => {
       const comments = []
@@ -138,7 +145,7 @@ DenormalizedViews.refreshByCollection({
 DenormalizedViews.refreshByCollection({
   identifier: DENORMALIZED_POST_COLLECTION,
   relatedCollection: Tags,
-  refreshIds: (doc, docPrevious, userId) => {
+  refreshIds: (doc, docPrevious) => {
     if (docPrevious) {
       // update
       return _.union(doc.postIds, docPrevious.postIds)
@@ -280,7 +287,7 @@ const validateFixtures = (fixtures) => {
 // TESTS
 if (Meteor.isServer) {
   describe('Foundation', function () {
-    it('CollectionHooks-package allows us to instanciate multiple hook-functions. All hooks defined hook-functions will be run.', function () {
+    it('CollectionHooks-package allows us to instanciate multiple hook-functions. All defined hook-functions will be run.', function () {
       // define 2 hooks to test if they are both run
       HookTestCollection.after.insert(function (userId, doc) {
         HookTestCollection.update(doc._id, { $set: { insertHook1: 'insertHook1 was here' } })
@@ -307,10 +314,6 @@ if (Meteor.isServer) {
       PostsDenormalizedView.remove({})
     })
 
-    // CONFIGURATION
-    // INSERT
-    // UPDATE
-    // REMOVE
     it('.addView does validate options correctly', function () {
       expect(() => {
         DenormalizedViews.addView({
@@ -359,6 +362,7 @@ if (Meteor.isServer) {
       const fixtures = setupFixtures()  // inserts happen here
       validateFixtures(fixtures)  // inserts are validated in here
     })
+
     it('.addView works as expected on UPDATES on viewCollection', function () {
       const fixtures = setupFixtures()
       validateFixtures(fixtures)
@@ -375,6 +379,7 @@ if (Meteor.isServer) {
       expect(postDenormalized1.wholeText).to.equal('post 1 newtext, comment 2, comment 3, author 2')
       expect(postDenormalized1.numberOfComments).to.equal(2)
     })
+
     it('.addView works as expected on REMOVES on viewCollection', function () {
       const fixtures = setupFixtures()
       validateFixtures(fixtures)
@@ -442,7 +447,7 @@ if (Meteor.isServer) {
       const fixtures = setupFixtures()
       validateFixtures(fixtures)
 
-      // this is a weird useCase for an insert-trigger, because oin order
+      // this is a weird useCase for an insert-trigger, because in order
       // to keep data consistentand enable Posts "view-collection"
       // to load the correct data, we need to set Posts.categoryId anyway.
       // So this test does NOT really make sense as it does NOT test, how relatedCollection()
@@ -502,7 +507,38 @@ if (Meteor.isServer) {
       expect(postDenormalized3.commentsCache.length).to.equal(0)
       expect(postDenormalized4.commentsCache.length).to.equal(1)
       expect(postDenormalized4.commentsCache[0].text).to.equal('comment 4 new text')
+    })
 
+    it('filter-option works as expected', function () {
+      const fixtures = setupFixtures()
+      validateFixtures(fixtures)
+      expect(PostsDenormalizedView.find().count()).to.equal(4)
+      // TEST:
+      // add 1 more post to test filter
+      // INSERT
+      // .. with text that is expected to be FILTERED
+      const id = Posts.insert({
+        text: 'post 5',  // to be FILTERED out
+        additionalText: 'additionalText post 1',
+        authorId: Authors.findOne()._id,  // random
+        commentIds: [
+          Comments.findOne()._id,  // random
+        ],
+      })
+      expect(PostsDenormalizedView.find().count()).to.equal(4)
+      // UPDATE
+      // .. same text (expect to be filtered out)
+      Posts.update(id, { $set: {
+        text: 'post 5',  // to be FILTERED out
+        additionalText: 'additionalText post 1 update',
+      } })
+      expect(PostsDenormalizedView.find().count()).to.equal(4)
+      // UPDATE
+      // .. different text (NOT to be filtered)
+      Posts.update(id, { $set: {
+        text: 'post 6',  // expect PASS
+      } })
+      expect(PostsDenormalizedView.find().count()).to.equal(5)
     })
   })
 }

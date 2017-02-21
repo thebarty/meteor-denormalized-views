@@ -1,16 +1,16 @@
-/* eslint-disable no-underscore-dangle */
+/* eslint-disable no-underscore-dangle  */
 
 /**
  * Denormalization
  */
 import { _ } from 'underscore'
-import { s } from 'underscore.string'
 
+import { check, Match } from 'meteor/check'
 import { Meteor } from 'meteor/meteor'
 import { Mongo } from 'meteor/mongo'
 import { SimpleSchema } from 'meteor/aldeed:simple-schema'
 
-import { debug, extend } from './tools.js'
+import { debug } from './tools.js'
 
 // ERRORS (export needed for tests)
 export const ERROR_IDENTIFIERT_EXISTS = 'identifier already exists'
@@ -35,12 +35,13 @@ export const DenormalizedViews = class DenormalizedViews {
       identifier: { type: String },
       sourceCollection: { type: Mongo.Collection },
       viewCollection: { type: Mongo.Collection },
+      filter: { type: Function, blackbox: true, optional: true },
       pick: { type: [String], optional: true },
-      sync: { type: Object, blackbox: true },
       postSync: { type: Object, blackbox: true, optional: true },
+      sync: { type: Object, blackbox: true },
     }).validate(options)
 
-    const { identifier, sourceCollection, viewCollection, pick, sync, postSync } = options
+    const { identifier, sourceCollection, viewCollection, sync } = options
 
     // Validate options
     // validate that identifier is NOT yet registered
@@ -54,10 +55,9 @@ export const DenormalizedViews = class DenormalizedViews {
     if (_.isEmpty(sync)) {
       throw new Meteor.Error(ERROR_SYNC_NEEDS_TO_HAVE_CONTENT)
     }
-    if (_.find(SyncronisationStore, (store) => {
-            return (store.sourceCollection===sourceCollection
-              && store.viewCollection===viewCollection)
-       })) {
+    if (_.find(SyncronisationStore,
+      store => (store.sourceCollection===sourceCollection
+        && store.viewCollection===viewCollection))) {
       throw new Meteor.Error(ERROR_SYNC_ALREADY_EXISTS_FOR_SOURCE_TARGET_COLLECTIONS)
     }
     // is valid? Register it
@@ -66,36 +66,51 @@ export const DenormalizedViews = class DenormalizedViews {
 
     // register hooks to sourceCollection
     // those hooks wil sync to viewCollection
-    sourceCollection.after.insert(function(userId, doc) {
+    sourceCollection.after.insert(function (userId, doc) {  // eslint-disable-line prefer-arrow-callback
       debug(`${sourceCollection._name}.after.insert`)
-      // fix for insert-hook
-      // doc._id = doc._id.insertedIds[0]
-      doc = DenormalizedViews._processDoc({
-        doc,
-        userId,
-        syncronisation: options,
-      })
-      DenormalizedViews._executeDatabaseComand(() => {
-        debug(`inserting doc with id ${doc._id}`)
-        viewCollection.insert(doc)
-      })
+      // Filter?
+      if (DenormalizedViews._isDocValidToBeProcessed({ doc, userId, syncronisation: options })) {
+        // fix for insert-hook
+        // doc._id = doc._id.insertedIds[0]
+        const processedDoc = DenormalizedViews._processDoc({
+          doc,
+          userId,
+          syncronisation: options,
+        })
+        DenormalizedViews._executeDatabaseComand(() => {
+          debug(`inserting doc with id ${processedDoc._id}`)
+          viewCollection.insert(processedDoc)
+        })
+      } else {
+        // filter OUT doc, if it exists
+        DenormalizedViews._removeDocFromViewCollectionIfExists({ doc, viewCollection: options.viewCollection })
+      }
     })
 
-    sourceCollection.after.update(function(userId, doc, fieldNames, modifier) {
+    sourceCollection.after.update(function (userId, doc) {  // eslint-disable-line prefer-arrow-callback
       debug(`${sourceCollection._name}.after.update`)
-      doc = DenormalizedViews._processDoc({
-        doc,
-        userId,
-        syncronisation: options,
-      })
-
-      DenormalizedViews._executeDatabaseComand(() => {
-        debug(`updating doc with id ${doc._id}`)
-        viewCollection.update(doc._id, { $set: doc })
-      })
+      // Filter?
+      if (DenormalizedViews._isDocValidToBeProcessed({ doc, userId, syncronisation: options })) {
+        const processedDoc = DenormalizedViews._processDoc({
+          doc,
+          userId,
+          syncronisation: options,
+        })
+        DenormalizedViews._executeDatabaseComand(() => {
+          debug(`updating doc with id ${processedDoc._id}`)
+          viewCollection.update(processedDoc._id, { $set: processedDoc }, {
+            upsert: true,  // important: it might be that doc has passed the filter AFTER an update
+                           //  and did NOT exist yet in "view"-collection, p.e. because on "insert"
+                           //  it did NOT pass the filter. So let's upsert
+          })
+        })
+      } else {
+        // filter OUT doc, if it exists
+        DenormalizedViews._removeDocFromViewCollectionIfExists({ doc, viewCollection: options.viewCollection })
+      }
     })
 
-    sourceCollection.after.remove(function(userId, doc) {
+    sourceCollection.after.remove(function (userId, doc) {  // eslint-disable-line prefer-arrow-callback
       debug(`${sourceCollection._name}.after.remove`)
       DenormalizedViews._executeDatabaseComand(() => {
         debug(`removing doc with id ${doc._id}`)
@@ -127,7 +142,7 @@ export const DenormalizedViews = class DenormalizedViews {
 
     debug(`setup refreshByCollection for identifier "${identifier}" and relatedCollection "${relatedCollection._name}"`)
 
-    relatedCollection.after.insert(function(userId, doc) {
+    relatedCollection.after.insert(function (userId, doc) {  // eslint-disable-line prefer-arrow-callback
       debug(`relatedCollection ${relatedCollection._name}.after.insert`)
       // doc._id = doc._id.insertedIds[0]  // fix for insert-hook
       const ids = DenormalizedViews._validateAndCallRefreshIds({ doc, refreshIds, userId })
@@ -141,7 +156,7 @@ export const DenormalizedViews = class DenormalizedViews {
       }
     })
 
-    relatedCollection.after.update(function(userId, doc, fieldNames, modifier) {
+    relatedCollection.after.update(function (userId, doc) {  // eslint-disable-line prefer-arrow-callback
       debug(`relatedCollection ${relatedCollection._name}.after.update`)
       const ids = DenormalizedViews._validateAndCallRefreshIds({
         doc,
@@ -164,7 +179,7 @@ export const DenormalizedViews = class DenormalizedViews {
     // his name or gets deleted than the "view"-collection needs to refresh.
     // Of course in this case the App itself would have to make sure that
     // before authorId is removed from sourceCollection
-    relatedCollection.after.remove(function(userId, doc) {
+    relatedCollection.after.remove(function (userId, doc) {  // eslint-disable-line prefer-arrow-callback
       debug(`relatedCollection ${relatedCollection._name}.after.remove`)
       const ids = DenormalizedViews._validateAndCallRefreshIds({ doc, refreshIds, userId })
       if (ids && ids.length>0) {
@@ -223,7 +238,7 @@ export const DenormalizedViews = class DenormalizedViews {
       existingSyncronisation.viewCollection.remove({})
     })
 
-    let ids = existingSyncronisation.sourceCollection.find({}, { fields: { '_id': 1 } }).fetch()
+    let ids = existingSyncronisation.sourceCollection.find({}, { fields: { _id: 1 } }).fetch()
     ids = _.pluck(ids, '_id')
 
     for (const id of ids) {
@@ -237,6 +252,28 @@ export const DenormalizedViews = class DenormalizedViews {
       })
     }
     debug(`${ids.length} docs in cache ${existingSyncronisation.viewCollection._name} were refreshed`)
+  }
+
+  /**
+   * Check, if the doc of the source-collection valid to be processed.
+   * If NO filter exists it is always valid.
+   * If a filter exists, the doc is considered valid, if the filter returns true.
+   * @return (Boolean) true if doc shall be further processed
+   * @return (Boolean) false if doc shall be filtered out
+   */
+  static _isDocValidToBeProcessed(options={}) {
+    const { syncronisation, userId } = options
+    const { filter } = syncronisation
+    const doc = options.doc
+    let returnValue = true
+    if (!_.isUndefined(filter) && _.isFunction(filter)) {
+      const filterResult = filter.call(this, doc, userId)
+      if (!_.isUndefined(filterResult) && _.isBoolean(filterResult) && filterResult===false) {
+        debug(`doc with _id ${doc._id} was filtered out. NO doc was created in "view"-collection`)
+        returnValue = false  // do NOT process
+      }
+    }
+    return returnValue
   }
 
   /**
@@ -254,7 +291,7 @@ export const DenormalizedViews = class DenormalizedViews {
     // we cannot use SimpleSchema-validation here,
     // because we want to support use of superclasses
     // for docs in collection.
-    if(!_.isObject(doc)) {
+    if (!_.isObject(doc)) {
       throw new Meteor.Error('options.doc needs to be an Object')
     }
     check(syncronisation, Object)
@@ -313,11 +350,24 @@ export const DenormalizedViews = class DenormalizedViews {
       doc = _.pick(doc, _.union(
         pick,
         Object.getOwnPropertyNames(sync),
-        Object.getOwnPropertyNames(postSync)
+        Object.getOwnPropertyNames(postSync),
       ))
     }
 
     return doc
+  }
+
+  /**
+   * Remove doc from view-collection
+   */
+  static _removeDocFromViewCollectionIfExists(options={}) {
+    const { doc, viewCollection } = options
+    DenormalizedViews._executeDatabaseComand(() => {
+      const nrOfUpdates = viewCollection.remove(doc._id)
+      if (nrOfUpdates>0) {
+        debug(`Removed doc ${doc._id} from view-collection, because it was filtered out`)
+      }
+    })
   }
 
   /**
@@ -372,9 +422,7 @@ export const DenormalizedViews = class DenormalizedViews {
 
     const { identifier } = options
 
-    return _.find(SyncronisationStore, (store) => {
-      return store.identifier===identifier
-    })
+    return _.find(SyncronisationStore, store => store.identifier===identifier)
   }
 
   /**
@@ -403,7 +451,7 @@ export const DenormalizedViews = class DenormalizedViews {
     // validate that the refreshIds-function returns either
     // undefined, [String] or []
     const ids = refreshIds.call(this, doc, docPrevious, userId)
-    if (! (Match.test(ids, [String]) || _.isUndefined(ids) || ids===[] )) {
+    if (!(Match.test(ids, [String]) || _.isUndefined(ids) || ids===[])) {
       throw new Meteor.Error(`refreshByCollection.refreshIds needs to return an array of strings, an empty array or undefined, BUT it returned "${ids}"`)
     }
 

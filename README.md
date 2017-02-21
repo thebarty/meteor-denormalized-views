@@ -7,7 +7,7 @@ A toolkit that helps you to create "read-only" denormalized mongo-"views" (colle
 
 The resulting "view"-collection can then be used with tools like ``aldeed:tabular``, or ``easy:search`` to display and search related data.
 
-Simply define how the data shall be collected based on a "source"-collection. Whenever a change happens in "source"-collection (insert | update | remove), the "view"-collection will automatically be refreshed. 
+Simply define how the data shall be collected based on a "source"-collection. Whenever a change happens in "source"-collection (insert | update | remove), the "view"-collection will automatically be refreshed.
 
 Additionally you can hookup "related"-collections to automatically refresh the "source"-collection or trigger manual refreshes (*if necessary at all*).
 
@@ -80,7 +80,7 @@ Of course the ``_id`` will be the same in both collections. A ``remove`` on the 
 
 ## Denormalize via ``sync:``
 
-Within the ``sync``-property you **extend the target document** and hand each new property a function to collect the denormalized data and return it. 
+Within the ``sync``-property you **extend the target document** and hand each new property a function to collect the denormalized data and return it.
 
 **Start by defining your synchronization:**
 
@@ -91,62 +91,62 @@ const IDENTIFIER = 'identifier' // unique id
 const PostsView = new Mongo.Collection('postsview')  // create "view"-collection
 
 DenormalizedViews.addView({
-	identifier: IDENTIFIER,
-	sourceCollection: Posts,
-	viewCollection: PostsView,
-	sync: {
-		// In here you extend the doc of the "source"-collection
-		// in order to be put into the "view"-collection.
-		// 
-		// Simply define a property and assign it a function. 
-		// Within the function: Collect the data you need
-		// and return it. If you return "undefined",
-		// the property will removed from the doc.
-		// 
-		// The function will be passed 2 parameters:
-		//  1) the current doc of the "source"-Collection 
-		//  2) the current userId (when available)
-		//  
-		//  Some examples:
-		authorCache: (post, userId) => {
-			return Authors.findOne(post.authorId)
-		},
-		categoryCache: (post, userId) => {
-			return Categories.findOne(post.categoryId)
-		},
-		commentsCache: (post, userId) => {
-			const comments = []
-			for (const commentId of post.commentIds) {
-				const comment = Comments.findOne(commentId)
-				comments.push(comment)
-			}
-			return comments
-		},
-	},
+  identifier: IDENTIFIER,
+  sourceCollection: Posts,
+  viewCollection: PostsView,
+  sync: {
+    // In here you extend the doc of the "source"-collection
+    // in order to be put into the "view"-collection.
+    //
+    // Simply define a property and assign it a function.
+    // Within the function: Collect the data you need
+    // and return it. If you return "undefined",
+    // the property will removed from the doc.
+    //
+    // The function will be passed 2 parameters:
+    //  1) the current doc of the "source"-Collection
+    //  2) the current userId (when available)
+    //  
+    //  Some examples:
+    authorCache: (post, userId) => {
+      return Authors.findOne(post.authorId)
+    },
+    categoryCache: (post, userId) => {
+      return Categories.findOne(post.categoryId)
+    },
+    commentsCache: (post, userId) => {
+      const comments = []
+      for (const commentId of post.commentIds) {
+        const comment = Comments.findOne(commentId)
+        comments.push(comment)
+      }
+      return comments
+    },
+  },
 })
 ```
 
 ## Create "joined search fields" via ``postSync:``
 
-There is also a ``postSync:`` property, which acts the same as ``sync:``, but is run **after** ``sync:`` has collected the data, meaning that the passed doc will already contain the new properties from ``sync:``. You can use ``postSync:`` to create joined search fields or get creative.
+There is also a ``postSync:`` property, which acts the same as ``sync:``, but it runs **after** ``sync:`` has collected data, meaning that the passed doc will already contain the new properties from ``sync:``. You can use ``postSync:`` to create joined search fields or get creative.
 
 ```js
-	// ... continuing the example from above
-	postSync: {
-		// This will be called AFTER ``sync:`` has attached 
-		// new data to the doc, so you can use this to create
-		// joined search fields, or get creative.
-		wholeText: (post, userId) => {
-			let authorText = ''
-			if (post.authorCache) {
-				authorText = post.authorCache.name
-			}
-			return `${post.text}, ${_.pluck(post.commentsCache, 'text').join(', ')}, ${authorText}`
-		},
-		numberOfComments: (post, userId) => {
-			return post.commentsCache.length
-		},
-	},
+  // ... continuing the example from above
+  postSync: {
+    // This will be called AFTER ``sync:`` has attached
+    // new data to the doc, so you can use this to create
+    // joined search fields, or get creative.
+    wholeText: (post, userId) => {
+      let authorText = ''
+      if (post.authorCache) {
+        authorText = post.authorCache.name
+      }
+      return `${post.text}, ${_.pluck(post.commentsCache, 'text').join(', ')}, ${authorText}`
+    },
+    numberOfComments: (post, userId) => {
+      return post.commentsCache.length
+    },
+  },
 ```
 
 ## Pick the fields you need via ``pick()``
@@ -155,14 +155,54 @@ By default the whole doc from your "source"-collection will be copied to "view"-
 
 ```js
 DenormalizedViews.addView({
-	identifier: IDENTIFIER,
-	sourceCollection: Posts,
-	viewCollection: PostsView,
-	pick: ['text'],  // (optional) set to pick specific fields
-									 // from sourceCollection
-	// continue with
-	// ... sync:
-	// ... postSync:
+  identifier: IDENTIFIER,
+  sourceCollection: Posts,
+  viewCollection: PostsView,
+  pick: ['text'],  // (optional) set to pick specific fields
+                   // from sourceCollection
+  // continue with
+  // ... sync:
+  // ... postSync:
+})
+```
+
+## Filter via ``filter()``
+
+In some useCases you ONLY want to create a doc in the "view"-collection, if it passes a FILTER. Use the `filter()`-option to specify this condition and have it `return true`, if you want the doc to be created. If the function returns anything else than `true`, there will be no further processing and an existing doc (with the same `_id` will be removed).
+
+Example:
+```js
+DenormalizedViews.addView({
+  identifier: IDENTIFIER,
+  sourceCollection: Posts,
+  viewCollection: PostsView,
+  filter(doc) {
+    if (doc.author==='Donald') {
+      return true  // process ONLY posts that where created by "Donald"
+    }
+    return false
+  },
+  // continue with
+  // ... sync:
+  // ... postSync:
+})
+```
+
+## Do post-processing via the ``postHook(doc)``-hook
+
+If you need to do some processing related to the creation of a "view"-doc, you can use the `postHook`-option. It will be called after a successful insert-/update-/remove- of the "view"-collection has happened and contains the resulting "view"-`doc` as the first parameter.
+
+Example:
+```js
+DenormalizedViews.addView({
+  identifier: IDENTIFIER,
+  sourceCollection: Posts,
+  viewCollection: PostsView,
+  // ... sync:
+  // ... postSync:
+  postHook(doc) {
+    // do something afterwards
+  },
 })
 ```
 
@@ -171,19 +211,19 @@ DenormalizedViews.addView({
 
 If within your app you only write to "source"-collection, that is all you have to do, because by setting up ``addView`` you enabled the automatic synchronization between "source"-Collection and "view"-collection.
 
-**BUT** changes made to other "related"-collections will potentially invalidate data within your "view"-collection. In our example that would happen when you update ``Authors.name``. *(p.e. ``PostsView.authorsCache.name`` will then contain the wrong old name)*
+**BUT** changes made to other "related"-collections will potentially invalidate data within your "view"-collection. In our example this would happen when you update ``Authors.name``. *(p.e. ``PostsView.authorsCache.name`` will then contain the wrong old name)*
 
 There are **2 options to keep the "view"-collection in sync with "related"-collection**:
- 1. hook up the **"related"-collection** via ``refreshByCollection()`` and let this package to the rest
+ 1. hook up the **"related"-collection** via ``refreshByCollection()`` and let this package do the rest
  2. do it **manually** via ``refreshManually(identifier)``
 
-Start with option 1) and use option 2) if needed at all.
+Recommendation: Start with option 1) and use option 2) if needed at all.
 
 ## *Automatically* synchronize "related"-collections (``refreshByCollection()``)
 
-Setup a ``refreshByCollection()`` to **automatically synchronize** changes made to a "related"-collection. Your task in here is to tell the "view"-collection which _ids shall be refreshed:
+Setup a ``refreshByCollection()`` to **automatically synchronize** changes made to a "related"-collection. Your task in here is to tell the "view"-collection which `_ids` shall be refreshed:
 
-Within the ``refreshIds``-parameter's function **return an array of ``_ids``**. Those _ids will then be refreshed within "view"-collection. The first parameter in this function gives you the current doc change in the "related"-collection. 
+Within the ``refreshIds``-parameter's function **return an array of ``_ids``**. Those `_ids` will then be refreshed within "view"-collection. The first parameter in this function gives you the current doc change in the "related"-collection.
 
 Within the ``relatedCollection`` parameter you define a function that returns the instance of the "related"-collection. By doing so we support circular-imports, p.e. where a "Product"-collection refreshes the "Category"-view and a "Category"-collection refreshes the "Product"-view. Read [4] for more infos.
 
@@ -191,37 +231,37 @@ If you return false, undefined or null a refresh will NOT be triggered.
 
 ```js
 DenormalizedViews.refreshByCollection({
-	identifier: IDENTIFIER,
-	relatedCollection: Authors,
-	refreshIds: (author, authorPrevious, userId) => {
-		// The function is passed 3 parameters
-		// 1) The current doc changed within the "related"-collection
-		// 2) The previous doc changed within the "related"-collection
-		//    (this is available on Mongo-"update"-modifiers)
-		// 3) The current userId (if available)
-		// Return an array of _ids that should be updated in "view"-collection.
-		// Returning false, an empty array or undefined, will simply 
-		// not refresh anything.
-		const posts = Posts.find({ authorId: author._id }).fetch()
-		return _.pluck(posts, '_id')
-	},
+  identifier: IDENTIFIER,
+  relatedCollection: Authors,
+  refreshIds: (author, authorPrevious, userId) => {
+    // The function is passed 3 parameters
+    // 1) The current doc changed within the "related"-collection
+    // 2) The previous doc changed within the "related"-collection
+    //    (this is available on Mongo-"update"-modifiers)
+    // 3) The current userId (if available)
+    // Return an array of _ids that should be updated in "view"-collection.
+    // Returning false, an empty array or undefined, will simply
+    // not refresh anything.
+    const posts = Posts.find({ authorId: author._id }).fetch()
+    return _.pluck(posts, '_id')
+  },
 })
 
 // Example2:
 // if you store references within the related collection,
 // be sure to union all affected _ids in doc & docPrevious
 DenormalizedViews.refreshByCollection({
-  	identifier: DENORMALIZED_POST_COLLECTION,
-  	relatedCollection: Categories,
-  	refreshIds: (doc, docPrevious, userId) => {
-  	  	if (docPrevious) {
-  	  	  // update
-  	  	  return _.union(doc.postIds, docPrevious.postIds)
-  	  	} else {
-  	  	  // insert | remove
-  	  	  return doc.postIds
-  	  	}
-  	},
+    identifier: DENORMALIZED_POST_COLLECTION,
+    relatedCollection: Categories,
+    refreshIds: (doc, docPrevious, userId) => {
+        if (docPrevious) {
+          // update
+          return _.union(doc.postIds, docPrevious.postIds)
+        } else {
+          // insert | remove
+          return doc.postIds
+        }
+    },
 })
 ```
 
@@ -234,15 +274,15 @@ There might be places where you want to **manually refresh** the "view"-collecti
 // this is the manual way of doing it,
 //  p.e. from a ``Meteor.method``
 DenormalizedViews.refreshManually({
-	identifier: IDENTIFIER, 
-	refreshIds: [Mongo._id],  // _id-array of posts that should be updated
+  identifier: IDENTIFIER,
+  refreshIds: [Mongo._id],  // _id-array of posts that should be updated
 })
 ```
 
 
 ## *Manually* refreshing the whole collection (``refreshAll()``)
 
-If you ever want to manually **refresh the whole "view"-collection"**, you can use ``refreshAll()``. 
+If you ever want to manually **refresh the whole "view"-collection"**, you can use ``refreshAll()``.
 
 **Note that this is the slowest option, because the whole table will be refreshed.**
 
@@ -274,7 +314,7 @@ DenormalizedViews.DeferWriteAccess = true
 
 # A full example containing all options
 
-**For a full example scenario, please have a look at the tests in "denormalized-views.tests.js".**
+**Please have a look at the tests in "denormalized-views.tests.js" for more details.**
 
 ```js
 import { DenormalizedViews } from 'meteor/thebarty:denormalized-views'
@@ -283,46 +323,44 @@ const IDENTIFIER = 'identifier' // unique id
 const PostsView = new Mongo.Collection('PostsView')
 
 DenormalizedViews.addView({
-	identifier: IDENTIFIER,  // unique id for synchronization
-	sourceCollection: Posts,
-	viewCollection: PostsView,
-	pick: ['text'],  // (optional) 
-	sync: {
-		authorCache: (post, userId) => {
-			return Authors.findOne(post.authorId)
-		},
-		categoryCache: (post, userId) => {
-			return Categories.findOne(post.categoryId)
-		},
-		commentsCache: (post, userId) => {
-			const comments = []
-			for (const commentId of post.commentIds) {
-				const comment = Comments.findOne(commentId)
-				comments.push(comment)
-			}
-			return comments
-		},
-	},
-	postSync: {
-		wholeText: (post, userId) => {
-			let authorText = ''
-			if (post.authorCache) {
-				authorText = post.authorCache.name
-			}
-			return `${post.text}, ${_.pluck(post.commentsCache, 'text').join(', ')}, ${authorText}`
-		},
-		numberOfComments: (post, userId) => {
-			return post.commentsCache.length
-		},
-	},
+  identifier: IDENTIFIER,  // unique id for synchronization
+  sourceCollection: Posts,
+  viewCollection: PostsView,
+  pick: ['text'],  // (optional)
+  sync: {
+    authorCache: (post, userId) => {
+      return Authors.findOne(post.authorId)
+    },
+    categoryCache: (post, userId) => {
+      return Categories.findOne(post.categoryId)
+    },
+    commentsCache: (post, userId) => {
+      const comments = []
+      for (const commentId of post.commentIds) {
+        const comment = Comments.findOne(commentId)
+        comments.push(comment)
+      }
+      return comments
+    },
+  },
+  postSync: {
+    wholeText: (post, userId) => {
+      let authorText = ''
+      if (post.authorCache) {
+        authorText = post.authorCache.name
+      }
+      return `${post.text}, ${_.pluck(post.commentsCache, 'text').join(', ')}, ${authorText}`
+    },
+    numberOfComments: (post, userId) => {
+      return post.commentsCache.length
+    },
+  },
 })
 ```
 
 # Latency compensation?
 
 Note that we run database-queries ONLY on the server, meaning that the client will receive new data via pub/sub on the "view"-collection. Tools like "aldeed:tabular" have build-in mechanisms to relax the client and only publish the docs currently needed.
-
-*In future versions we might add a "publishToClient"-option within ``addView`` to configure on a per-table-basis auto-publish. Let us know if you need it.*
 
 
 # Open Todos
@@ -337,7 +375,6 @@ Lets make this perfect and collaborate. This is how to set up your local testing
  2. copy this package into the packages dir, p.e. "./whatever/packages/denormalized-views"
  3. run tests from the root (/whatever/.) of your project like ``meteor test-packages ./packages/denormalized-views/ --driver-package practicalmeteor:mocha``
  4. develop, write tests, and submit a pull request
-
 
 # Research Resources
 

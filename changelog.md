@@ -10,8 +10,15 @@
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
+
+# 0.0.8
+  * added `filter(doc)`-option (optional) to `DenormalizedViews.addView`, which can be used to only create a doc in the "view"-collection, if it passes a filter (meaning if the function returns `true`).
+
+  * added `postHook`-option (optional) to `DenormalizedViews.addView`, which you can pass a function that will be called after a successfull insert-/update-/remove- of the "view"-collection.
+
+
 # 0.0.7
-	* Enhanced ``refreshByCollection.refreshIds`` to pass previousDoc as a parameter. In a lot of useCases this is needed to get all affected _ids
-	* throw ``Meteor.Error`` instead of pure ``Error``
-	* when ``sync``- or ``postSync`` functions return ``0`` or ``[]`` the property will now be stored in the doc
-	* added more tests
+  * Enhanced ``refreshByCollection.refreshIds`` to pass previousDoc as a parameter. In a lot of useCases this is needed to get all affected _ids
+  * throw ``Meteor.Error`` instead of pure ``Error``
+  * when ``sync``- or ``postSync`` functions return ``0`` or ``[]`` the property will now be stored in the doc
+  * added more tests
