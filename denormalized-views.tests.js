@@ -406,6 +406,13 @@ if (Meteor.isServer) {
       expect(postDenormalized1).to.be.undefined
     })
 
+    it('.getView works as expected', function () {
+      const fixtures = setupFixtures()
+      validateFixtures(fixtures)
+
+      expect(DenormalizedViews.getView(DENORMALIZED_POST_COLLECTION).identifier).to.equal(DENORMALIZED_POST_COLLECTION)
+    })
+
     it('.refreshByCollection correctly validated options', function () {
       expect(() => {
         DenormalizedViews.refreshByCollection({

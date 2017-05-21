@@ -123,6 +123,15 @@ export const DenormalizedViews = class DenormalizedViews {
     })
   }
 
+  /**
+   * Get a reference to an existing view, identified by an identifier.
+   * You can use this in unit-tests to stub certain behaviour.
+   */
+  static getView(identifier) {
+    check(identifier, String)
+    return DenormalizedViews._getExistingSyncronisation({ identifier })
+  }
+
   static refreshByCollection(options = {}) {
     new SimpleSchema({
       identifier: { type: String },
