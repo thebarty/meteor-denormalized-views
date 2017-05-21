@@ -89,6 +89,9 @@ DenormalizedViews.addView({
   },
   postHook(doc, userId) {
     HookClass.processHook(doc, userId)
+    PostsDenormalizedView.update(doc._id, { $set: {
+      postHookValue: `postHookValue for ${doc._id}`,
+    }})
   },
   sync: {
     commentsCache: (post, userId) => {
@@ -525,11 +528,15 @@ if (Meteor.isServer) {
 
       expect(postDenormalized1.commentsCache.length).to.equal(1)
       expect(postDenormalized1.commentsCache[0].text).to.equal('comment 1 new text')
+      expect(postDenormalized1.postHookValue).to.equal(`postHookValue for ${fixtures.postId1}`)
       expect(postDenormalized2.commentsCache.length).to.equal(1)
       expect(postDenormalized2.commentsCache[0].text).to.equal('comment 2 new text')
+      expect(postDenormalized2.postHookValue).to.equal(`postHookValue for ${fixtures.postId2}`)
       expect(postDenormalized3.commentsCache.length).to.equal(0)
+      expect(postDenormalized3.postHookValue).to.equal(`postHookValue for ${fixtures.postId3}`)
       expect(postDenormalized4.commentsCache.length).to.equal(1)
       expect(postDenormalized4.commentsCache[0].text).to.equal('comment 4 new text')
+      expect(postDenormalized4.postHookValue).to.equal(`postHookValue for ${fixtures.postId4}`)
     })
 
     it('filter-option works as expected', function () {

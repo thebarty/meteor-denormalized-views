@@ -236,7 +236,7 @@ export const DenormalizedViews = class DenormalizedViews {
    * Do a TOTAL refresh of the target-collection,
    * meaning that ALL elements will get reloaded.
    *
-   * In big collections this can bei
+   * In big collections this can be very time-intense. So be careful with timeouts.
    *
    * @param  {[type]} identifier [description]
    * @return {[type]}            [description]
@@ -263,6 +263,8 @@ export const DenormalizedViews = class DenormalizedViews {
       DenormalizedViews._executeDatabaseComand(() => {
         existingSyncronisation.viewCollection.insert(doc)
       })
+      // TODO: add `Meteor.userId()`. we had problems getting it to work (adding "meteor-base" to packages did not help)
+      DenormalizedViews._callPostHookIfExists({ doc, userId: undefined, postHook: existingSyncronisation.postHook })
     }
     debug(`${ids.length} docs in cache ${existingSyncronisation.viewCollection._name} were refreshed`)
   }
@@ -434,7 +436,8 @@ export const DenormalizedViews = class DenormalizedViews {
   }
 
   /**
-   * return an exising syncronisation by a given identifier
+   * Return an exising syncronisation by a given identifier.
+   * NOTE: *depreciated* use `getView()` instead.
    * @param  {Object} options [description]
    * @return {[type]}         [description]
    */
