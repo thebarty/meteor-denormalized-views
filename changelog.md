@@ -13,6 +13,9 @@
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 
+# 0.0.10
+  * quickfix for 0.0.9 which crashed in production due to wrong use of `Package.onUse()`
+
 # 0.0.9
   * made `refreshAll()` call `postHook()` (if defined)
   * fix to add files ONLY to server
