@@ -5,7 +5,7 @@ import { DenormalizedViews } from './denormalized-views.js'
  */
 export const debug = function debug(message, object = undefined) {
   if (DenormalizedViews.Debug) {
-    console.log(message)
+    console.log(`[DenormalizedViews] ${message}`)
     if (object) {
       console.log(object)
     }
