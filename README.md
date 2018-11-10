@@ -284,7 +284,7 @@ DenormalizedViews.refreshManually({
 
 ## *Manually* refreshing the whole collection (``refreshAll()``)
 
-If you ever want to manually **refresh the whole "view"-collection"**, you can use ``refreshAll()``.
+If you ever want to manually **refresh the whole "view"-collection"**, you can use ``refreshAll()``. Filter will be applied, if defined via `filter()`.
 
 **Note that this is the slowest option, because the whole table will be refreshed.**
 
@@ -383,8 +383,8 @@ Note that we run database-queries ONLY on the server, meaning that the client wi
 
 Lets make this perfect and collaborate. This is how to set up your local testing environment:
  1. run "meteor create whatever; cd whatever; mkdir packages;"
- 2. copy this package into the packages dir, p.e. "./whatever/packages/denormalized-views"
- 3. run tests from the root (/whatever/.) of your project like ``meteor test-packages ./packages/denormalized-views/ --driver-package practicalmeteor:mocha``
+ 2. clone this package into the packages dir, p.e. "cd packages; git clone https://github.com/thebarty/meteor-denormalized-views.git denormalized-views"
+ 3. run tests from the root (/whatever/.) of your project like ``meteor test-packages ./packages/meteor-denormalized-views/ --driver-package=cultofcoders:mocha``
  4. develop, write tests, and submit a pull request
 
 # Research Resources

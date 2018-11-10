@@ -1,6 +1,6 @@
 Package.describe({
   name: 'thebarty:denormalized-views',
-  version: '0.0.10',
+  version: '0.0.11',
   summary: 'Easily create "readonly" denormalized mongo-"views" (collections), p.e. for searchable tables',
   git: 'https://github.com/thebarty/meteor-denormalized-views',
   documentation: 'README.md',
@@ -40,8 +40,8 @@ Package.onTest(function(api) {
     'aldeed:simple-schema',
     'aldeed:collection2@2.9.1',
     'matb33:collection-hooks',
-    'practicalmeteor:mocha',
     'thebarty:denormalized-views',
+    'cultofcoders:mocha',
   ])
   // TODO add code ONLY to server without crashing production,
   //  BUT be CAREFUL: a simple `], 'server')` will crash the client when running

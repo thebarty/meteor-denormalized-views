@@ -6,12 +6,16 @@
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
 
+- [0.0.11](#0011)
+- [0.0.10](#0010)
 - [0.0.9](#009)
 - [0.0.8](#008)
 - [0.0.7](#007)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
+# 0.0.11
+ * made `refreshAll()` use `filter()` (if defined)
 
 # 0.0.10
   * quickfix for 0.0.9 which crashed in production due to wrong use of `Package.onUse()`

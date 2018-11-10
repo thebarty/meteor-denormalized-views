@@ -255,16 +255,22 @@ export const DenormalizedViews = class DenormalizedViews {
     ids = _.pluck(ids, '_id')
 
     for (const id of ids) {
-      let doc = existingSyncronisation.sourceCollection.findOne(id)
-      doc = DenormalizedViews._processDoc({
-        doc,
-        syncronisation: existingSyncronisation,
-      })
-      DenormalizedViews._executeDatabaseComand(() => {
-        existingSyncronisation.viewCollection.insert(doc)
-      })
-      // TODO: add `Meteor.userId()`. we had problems getting it to work (adding "meteor-base" to packages did not help)
-      DenormalizedViews._callPostHookIfExists({ doc, userId: undefined, postHook: existingSyncronisation.postHook })
+      let doc = existingSyncronisation.sourceCollection.findOne(id)  // todo check if we better use data from fetch above
+      const userId = undefined  // TODO: add `Meteor.userId()`. we had problems getting it to work (adding "meteor-base" to packages did not help)
+      // Filter?
+      if (DenormalizedViews._isDocValidToBeProcessed({ doc, userId, syncronisation: existingSyncronisation })) {
+        debug(`refreshAll refreshing doc._id ${id}`)
+        doc = DenormalizedViews._processDoc({
+          doc,
+          syncronisation: existingSyncronisation,
+        })
+        DenormalizedViews._executeDatabaseComand(() => {
+          existingSyncronisation.viewCollection.insert(doc)
+        })
+        DenormalizedViews._callPostHookIfExists({ doc, userId: undefined, postHook: existingSyncronisation.postHook })
+      } else {
+        debug(`refreshAll: filtered out doc._id ${id}`)
+      }
     }
     debug(`${ids.length} docs in cache ${existingSyncronisation.viewCollection._name} were refreshed`)
   }

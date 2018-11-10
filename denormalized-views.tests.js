@@ -518,6 +518,14 @@ if (Meteor.isServer) {
       Comments.update(fixtures.commentId2, { $set: { text: 'comment 2 new text' } })
       Comments.update(fixtures.commentId3, { $set: { text: 'comment 3 new text' } })
       Comments.update(fixtures.commentId4, { $set: { text: 'comment 4 new text' } })
+      const filteredId = Posts.insert({
+        text: 'post 5',  // to be FILTERED out
+        additionalText: 'additionalText post 1',
+        authorId: Authors.findOne()._id,  // random
+        commentIds: [
+          Comments.findOne()._id,  // random
+        ],
+      })
 
       DenormalizedViews.refreshAll(DENORMALIZED_POST_COLLECTION)
 
@@ -525,6 +533,7 @@ if (Meteor.isServer) {
       const postDenormalized2 = PostsDenormalizedView.findOne(fixtures.postId2)
       const postDenormalized3 = PostsDenormalizedView.findOne(fixtures.postId3)
       const postDenormalized4 = PostsDenormalizedView.findOne(fixtures.postId4)
+      expect(PostsDenormalizedView.findOne(filteredId)).to.be.undefined
 
       expect(postDenormalized1.commentsCache.length).to.equal(1)
       expect(postDenormalized1.commentsCache[0].text).to.equal('comment 1 new text')
